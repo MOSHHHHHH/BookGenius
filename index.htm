@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BookGenius - יוצר הספרים</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Heebo', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+        
+        /* Animations */
+        .fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        
+        .slide-up {
+            animation: slideUp 0.5s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555; 
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, #4f46e5 0%, #3b82f6 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -10px rgba(59, 130, 246, 0.5);
+        }
+
+        .step-indicator.active {
+            background-color: #4f46e5;
+            color: white;
+            border-color: #4f46e5;
+        }
+        .step-indicator.completed {
+            background-color: #10b981;
+            color: white;
+            border-color: #10b981;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4">
+
+    <div class="glass-panel w-full max-w-4xl rounded-2xl overflow-hidden min-h-[600px] flex flex-col relative">
+        
+        <!-- Header -->
+        <header class="bg-white/50 border-b border-gray-200 p-6 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xl">
+                    <i class="fas fa-book-open"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-800">BookGenius</h1>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="resetApp()" class="text-gray-500 hover:text-red-500 transition-colors" title="התחל מחדש">
+                    <i class="fas fa-redo"></i> איפוס
+                </button>
+            </div>
+        </header>
+
+        <!-- Progress Bar -->
+        <div class="bg-gray-100 h-1 w-full">
+            <div id="progressBar" class="bg-indigo-600 h-full w-0 transition-all duration-500"></div>
+        </div>
+
+        <!-- Content Area -->
+        <main class="flex-1 p-8 overflow-y-auto relative">
+            
+            <!-- Step 1: Permissions & Welcome -->
+            <div id="step1" class="step-view fade-in flex flex-col items-center justify-center h-full text-center space-y-6">
+                <div class="w-24 h-24 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 text-4xl mb-4">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <h2 class="text-3xl font-bold text-gray-800">ברוכים הבאים ל-BookGenius</h2>
+                <p class="text-gray-600 max-w-lg text-lg">
+                    אפליקציה זו תעזור לך ליצור ספר שלם בעזרת בינה מלאכותית.
+                    אנו נשתמש בלוח הגזירים (Clipboard) כדי להעביר הנחיות (Prompts) בינך לבין ה-LLM.
+                </p>
+                <button onclick="goToStep(2)" class="btn-primary text-white px-8 py-3 rounded-full text-lg font-bold shadow-lg flex items-center gap-2">
+                    התחל ביצירה <i class="fas fa-arrow-left"></i>
+                </button>
+            </div>
+
+            <!-- Step 2: Book Details Input -->
+            <div id="step2" class="step-view hidden slide-up space-y-6">
+                <h2 class="text-2xl font-bold text-gray-800 border-r-4 border-indigo-500 pr-3">הגדרת הספר</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-2">
+                        <label class="block text-sm font-medium text-gray-700">כותרת הספר</label>
+                        <input type="text" id="bookTitle" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="למשל: מסע אל העתיד">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="block text-sm font-medium text-gray-700">מספר פרקים</label>
+                        <input type="number" id="chapterCount" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" value="10" min="1" max="50">
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">תיאור הספר</label>
+                    <textarea id="bookDesc" rows="3" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="על מה הספר מדבר?"></textarea>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">הנחיות כתיבה (סגנון, טון, קהל יעד)</label>
+                    <textarea id="writingInstructions" rows="3" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="למשל: סגנון דרמטי, מתאים לנוער, שפה עשירה"></textarea>
+                </div>
+
+                <div class="flex justify-end pt-4">
+                    <button onclick="generateTOCPrompt()" class="btn-primary text-white px-8 py-3 rounded-lg font-bold shadow-md">
+                        צור פרומפט לתוכן עניינים <i class="fas fa-magic mr-2"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 3: Copy TOC Prompt -->
+            <div id="step3" class="step-view hidden slide-up space-y-6">
+                <h2 class="text-2xl font-bold text-gray-800 border-r-4 border-indigo-500 pr-3">שלב 1: יצירת מבנה הספר</h2>
+                <p class="text-gray-600">הפרומפט הבא נוצר עבורך. הוא יבקש מה-LLM ליצור את מבנה הספר בפורמט JSON מדויק.</p>
+                
+                <div class="relative">
+                    <textarea id="tocPromptOutput" readonly class="w-full h-64 p-4 bg-gray-50 border border-gray-300 rounded-lg font-mono text-sm resize-none focus:outline-none"></textarea>
+                    <div id="copyBadgeStep3" class="absolute top-4 left-4 bg-green-500 text-white text-xs px-2 py-1 rounded opacity-0 transition-opacity">הועתק!</div>
+                </div>
+
+                <div class="flex justify-between items-center">
+                    <button onclick="copyToClipboard('tocPromptOutput', 'copyBadgeStep3')" class="bg-gray-800 text-white px-6 py-2 rounded-lg hover:bg-gray-900 transition-colors">
+                        <i class="fas fa-copy ml-2"></i> העתק שוב
+                    </button>
+                    <button onclick="goToStep(4)" class="btn-primary text-white px-8 py-3 rounded-lg font-bold shadow-md">
+                        העתקתי, עבור לשלב הבא <i class="fas fa-arrow-left mr-2"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 4: Paste JSON Result -->
+            <div id="step4" class="step-view hidden slide-up space-y-6">
+                <h2 class="text-2xl font-bold text-gray-800 border-r-4 border-purple-500 pr-3">קליטת תוכן העניינים</h2>
+                <p class="text-gray-600">הדבק כאן את התשובה שקיבלת מה-LLM (את קוד ה-JSON המלא).</p>
+                
+                <textarea id="jsonInput" class="w-full h-64 p-4 border-2 border-dashed border-gray-300 rounded-lg focus:border-indigo-500 focus:ring-0 outline-none font-mono text-sm" placeholder="הדבק כאן את ה-JSON..."></textarea>
+                <p id="jsonError" class="text-red-500 text-sm hidden"><i class="fas fa-exclamation-circle"></i> שגיאה בפענוח ה-JSON. וודא שהעתקת רק את הקוד או את הבלוק המלא.</p>
+
+                <div class="flex justify-between items-center pt-4">
+                     <button onclick="goToStep(3)" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-arrow-right"></i> חזור
+                    </button>
+                    <button onclick="processJSON()" class="btn-primary text-white px-8 py-3 rounded-lg font-bold shadow-md">
+                        עבד נתונים והתחל כתיבה <i class="fas fa-cogs mr-2"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 5: Chapter Generation Dashboard -->
+            <div id="step5" class="step-view hidden slide-up space-y-6 h-full flex flex-col">
+                <div class="flex justify-between items-end border-b pb-4">
+                    <div>
+                        <h2 id="displayBookTitle" class="text-2xl font-bold text-indigo-700"></h2>
+                        <p class="text-gray-500 text-sm">ניהול וכתיבת פרקים</p>
+                    </div>
+                    <div class="text-left">
+                        <span id="chapterProgress" class="text-2xl font-bold text-gray-800">1/10</span>
+                        <span class="text-gray-500 text-sm block">פרקים</span>
+                    </div>
+                </div>
+
+                <!-- Chapter Card -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex-1 flex flex-col gap-4">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-bold">פרק <span id="currentChapterNum">1</span></span>
+                        <h3 id="currentChapterTitle" class="text-xl font-bold text-gray-800"></h3>
+                    </div>
+                    
+                    <p id="currentChapterDesc" class="text-gray-600 italic bg-gray-50 p-3 rounded-lg border-r-4 border-gray-300"></p>
+                    
+                    <div class="flex-1 flex flex-col gap-2 mt-4">
+                        <label class="text-sm font-bold text-gray-700">פרומפט לכתיבת הפרק (מוכן להעתקה):</label>
+                        <div class="relative flex-1">
+                            <textarea id="chapterPromptOutput" readonly class="w-full h-full min-h-[150px] p-4 bg-gray-900 text-green-400 rounded-lg font-mono text-sm resize-none"></textarea>
+                            <div id="copyBadgeStep5" class="absolute top-4 left-4 bg-green-600 text-white text-xs px-2 py-1 rounded opacity-0 transition-opacity">הועתק!</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation Controls -->
+                <div class="flex justify-between items-center bg-gray-50 p-4 rounded-xl">
+                    <button onclick="prevChapter()" id="btnPrev" class="px-4 py-2 rounded-lg border border-gray-300 hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="fas fa-arrow-right ml-2"></i> הקודם
+                    </button>
+                    
+                    <button onclick="copyToClipboard('chapterPromptOutput', 'copyBadgeStep5')" class="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-indigo-700 hover:scale-105 transition-all">
+                        <i class="fas fa-copy"></i> העתק פרומפט
+                    </button>
+
+                    <button onclick="nextChapter()" id="btnNext" class="px-4 py-2 rounded-lg border border-gray-300 hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        הבא <i class="fas fa-arrow-left mr-2"></i>
+                    </button>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        // State Management
+        let appState = {
+            step: 1,
+            bookData: {
+                title: '',
+                description: '',
+                count: 10,
+                instructions: ''
+            },
+            chapters: [],
+            currentChapterIndex: 0
+        };
+
+        // Initialize
+        function init() {
+            goToStep(1);
+        }
+
+        // Navigation Logic
+        function goToStep(stepNumber) {
+            // Validate step 2
+            if (stepNumber === 3 && appState.step === 2) {
+                const title = document.getElementById('bookTitle').value;
+                const desc = document.getElementById('bookDesc').value;
+                if (!title || !desc) {
+                    alert('אנא מלא לפחות כותרת ותיאור לספר');
+                    return;
+                }
+            }
+
+            // Hide all steps
+            document.querySelectorAll('.step-view').forEach(el => {
+                el.classList.add('hidden');
+                el.classList.remove('slide-up'); // Reset animation
+            });
+
+            // Show current step
+            const currentEl = document.getElementById(`step${stepNumber}`);
+            currentEl.classList.remove('hidden');
+            void currentEl.offsetWidth; // Trigger reflow for animation
+            currentEl.classList.add('slide-up');
+
+            appState.step = stepNumber;
+            updateProgressBar();
+        }
+
+        function updateProgressBar() {
+            const totalSteps = 5;
+            const percentage = ((appState.step - 1) / (totalSteps - 1)) * 100;
+            document.getElementById('progressBar').style.width = `${percentage}%`;
+        }
+
+        function resetApp() {
+            if(confirm('האם אתה בטוח שברצונך לאפס את הכל?')) {
+                location.reload();
+            }
+        }
+
+        // --- Logic: Step 2 to 3 (Generate TOC Prompt) ---
+
+        function generateTOCPrompt() {
+            // Gather Data
+            appState.bookData.title = document.getElementById('bookTitle').value;
+            appState.bookData.description = document.getElementById('bookDesc').value;
+            appState.bookData.count = document.getElementById('chapterCount').value;
+            appState.bookData.instructions = document.getElementById('writingInstructions').value;
+
+            // Construct JSON Schema String (Escaped properly)
+            const jsonSchema = `{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BookChapters",
+  "type": "object",
+  "properties": {
+    "book_title": { "type": "string", "description": "שם הספר" },
+    "chapters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "chapter_number": { "type": "integer", "description": "מספר הפרק בסדר עולה" },
+          "title": { "type": "string", "description": "כותרת הפרק" },
+          "description": { "type": "string", "description": "תיאור קצר של תוכן הפרק" }
+        },
+        "required": ["chapter_number", "title", "description"]
+      }
+    }
+  },
+  "required": ["book_title", "chapters"]
+}`;
+
+            // Construct Prompt
+            const prompt = `צור לי תוכן עניינים של ספר בנושא "${appState.bookData.title}".
+תיאור הספר: ${appState.bookData.description}.
+הספר יכלול ${appState.bookData.count} פרקים.
+הנחיות נוספות: ${appState.bookData.instructions}.
+
+אנא צור את התוכן בפורמט JSON בלבד, ללא טקסט נוסף לפני או אחרי, לפי הסכימה הבאה:
+${jsonSchema}`;
+
+            // Set UI
+            document.getElementById('tocPromptOutput').value = prompt;
+            
+            // Go to step 3
+            goToStep(3);
+
+            // Auto Copy
+            setTimeout(() => {
+                copyToClipboard('tocPromptOutput', 'copyBadgeStep3');
+            }, 500);
+        }
+
+        // --- Logic: Step 4 to 5 (Parse JSON & Setup Dashboard) ---
+
+        function processJSON() {
+            const input = document.getElementById('jsonInput').value;
+            const errorEl = document.getElementById('jsonError');
+            
+            try {
+                // Sanitize input: find the JSON object even if there is markdown text around it
+                let jsonString = input;
+                const match = input.match(/\{[\s\S]*\}/);
+                if (match) {
+                    jsonString = match[0];
+                }
+
+                const data = JSON.parse(jsonString);
+
+                // Validation
+                if (!data.chapters || !Array.isArray(data.chapters)) {
+                    throw new Error("Invalid structure");
+                }
+
+                // Update State
+                appState.chapters = data.chapters;
+                appState.bookData.title = data.book_title || appState.bookData.title; // Use JSON title if available
+                appState.currentChapterIndex = 0;
+
+                // Setup Dashboard
+                document.getElementById('displayBookTitle').innerText = appState.bookData.title;
+                loadChapter(0);
+                
+                goToStep(5);
+                errorEl.classList.add('hidden');
+
+            } catch (e) {
+                console.error(e);
+                errorEl.classList.remove('hidden');
+                errorEl.innerText = "שגיאה בפענוח הנתונים. וודא שהדבקת את ה-JSON בצורה תקינה.";
+            }
+        }
+
+        // --- Logic: Chapter Management ---
+
+        function loadChapter(index) {
+            if (index < 0 || index >= appState.chapters.length) return;
+
+            appState.currentChapterIndex = index;
+            const chapter = appState.chapters[index];
+
+            // Update UI Info
+            document.getElementById('currentChapterNum').innerText = chapter.chapter_number;
+            document.getElementById('currentChapterTitle').innerText = chapter.title;
+            document.getElementById('currentChapterDesc').innerText = chapter.description;
+            document.getElementById('chapterProgress').innerText = `${index + 1}/${appState.chapters.length}`;
+
+            // Generate Prompt
+            const prompt = `כתוב את פרק מספר ${chapter.chapter_number} מהספר "${appState.bookData.title}".
+נושא הספר: ${appState.bookData.description}.
+
+הפרק הנוכחי: "${chapter.title}"
+תיאור הפרק: ${chapter.description}
+
+הנחיות כלליות לכתיבה:
+${appState.bookData.instructions}
+
+אנא כתוב את הפרק במלואו, בצורה סוחפת ומקצועית.`;
+
+            document.getElementById('chapterPromptOutput').value = prompt;
+
+            // Auto Copy
+            setTimeout(() => {
+                copyToClipboard('chapterPromptOutput', 'copyBadgeStep5');
+            }, 300);
+
+            // Update Buttons State
+            document.getElementById('btnPrev').disabled = index === 0;
+            document.getElementById('btnNext').disabled = index === appState.chapters.length - 1;
+        }
+
+        function nextChapter() {
+            loadChapter(appState.currentChapterIndex + 1);
+        }
+
+        function prevChapter() {
+            loadChapter(appState.currentChapterIndex - 1);
+        }
+
+        // --- Utilities ---
+
+        function copyToClipboard(elementId, badgeId) {
+            const copyText = document.getElementById(elementId);
+            
+            // Select text
+            copyText.select();
+            copyText.setSelectionRange(0, 99999); // For mobile devices
+
+            // Copy
+            try {
+                navigator.clipboard.writeText(copyText.value).then(() => {
+                    showBadge(badgeId);
+                }).catch(err => {
+                    // Fallback
+                    document.execCommand('copy');
+                    showBadge(badgeId);
+                });
+            } catch (err) {
+                console.error('Failed to copy', err);
+            }
+        }
+
+        function showBadge(badgeId) {
+            const badge = document.getElementById(badgeId);
+            badge.classList.remove('opacity-0');
+            setTimeout(() => {
+                badge.classList.add('opacity-0');
+            }, 2000);
+        }
+
+        // Start
+        init();
+
+    </script>
+</body>
+</html>
