@@ -135,6 +135,21 @@ body{
 }
 .skill-badge:hover{border-color:var(--gold);color:var(--gold)}
 .skill-badge.selected{background:var(--gold-dim);border-color:var(--gold);color:var(--gold)}
+/* Batch size picker */
+.batch-btn{
+  width:42px;height:42px;border-radius:10px;
+  background:var(--card);border:1.5px solid var(--border);
+  color:var(--muted);font-size:.95rem;font-weight:800;
+  cursor:pointer;font-family:'Heebo',sans-serif;
+  transition:all .2s;display:flex;align-items:center;justify-content:center;
+}
+.batch-btn:hover{border-color:var(--gold);color:var(--gold)}
+.batch-btn.selected{
+  background:var(--gold-dim);border-color:var(--gold);color:var(--gold);
+  box-shadow:0 0 0 3px var(--gold-dim);
+}
+.batch-hint{font-size:.76rem;color:var(--muted);font-style:italic;line-height:1.6}
+.batch-hint b{color:var(--text);font-style:normal;font-weight:700}
 /* Toggle */
 .toggle-row{display:flex;align-items:center;gap:12px}
 .toggle-sw{position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;direction:ltr}
@@ -327,6 +342,18 @@ body{
     <button type="button" id="skill_code"  onclick="toggleSkill('code')"  class="skill-badge"><i class="fas fa-code"></i> קוד</button>
   </div>
 
+  <!-- Batch size selector -->
+  <div style="display:flex;align-items:center;flex-wrap:wrap;gap:14px;padding:14px 16px;background:var(--card);border-radius:12px;border:1px solid var(--border)">
+    <span style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);white-space:nowrap">פרקים בפעם:</span>
+    <div style="display:flex;gap:6px">
+      <button type="button" id="batch1" onclick="setBatch(1)" class="batch-btn selected">1</button>
+      <button type="button" id="batch2" onclick="setBatch(2)" class="batch-btn">2</button>
+      <button type="button" id="batch3" onclick="setBatch(3)" class="batch-btn">3</button>
+      <button type="button" id="batch4" onclick="setBatch(4)" class="batch-btn">4</button>
+    </div>
+    <p class="batch-hint"><b>פחות פרקים בפעם</b> — איכות ודיוק&emsp;·&emsp;<b>יותר פרקים בפעם</b> — מהירות</p>
+  </div>
+
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px">
     <div class="toggle-row">
       <label class="toggle-sw">
@@ -493,7 +520,9 @@ let S = {
   book:{title:'',desc:'',chapters:10,extra:'',skills:[],intro:false},
   toc:null,   // parsed TOC JSON
   done:{},    // {chapter_number: chapterJSON}
-  curCh:0,    // current chapter_number in step4
+  curCh:0,    // first chapter_number in current batch
+  batchSize:1,// how many chapters to write per prompt (1-4)
+  curBatch:[], // chapter_numbers in the active batch
 };
 
 // ─────────────────────────────────────────────
@@ -663,6 +692,7 @@ function restoreForm(){
   $('s1_extra').value   =S.book.extra||'';
   $('s1_intro').checked =S.book.intro||false;
   (S.book.skills||[]).forEach(sk=>{const el=$('skill_'+sk);if(el)el.classList.add('selected');});
+  setBatch(S.batchSize||1);
 }
 
 // ─────────────────────────────────────────────
@@ -699,6 +729,12 @@ function toggleSkill(sk){
   save();
 }
 
+function setBatch(n){
+  S.batchSize=n;
+  for(let i=1;i<=4;i++){const el=$('batch'+i);if(el)el.classList.toggle('selected',i===n);}
+  save();
+}
+
 // ─────────────────────────────────────────────
 // SCHEMAS
 // ─────────────────────────────────────────────
@@ -728,8 +764,13 @@ function tocSchema(){
 }`;
 }
 
-function chapterSchema(chNum){
-  const types=[
+// chNums: array of chapter numbers (even for single chapter)
+function chapterSchema(chNums){
+  if(!Array.isArray(chNums)) chNums=[chNums]; // safety
+  const numsStr=chNums.join(', ');
+  const isMulti=chNums.length>1;
+
+  const contentTypes=[
     `{
           "description": "Paragraph of text",
           "properties": { "type":{"const":"text"}, "text":{"type":"string","description":"Paragraph in Hebrew"} },
@@ -742,7 +783,7 @@ function chapterSchema(chNum){
         }`
   ];
   if(S.book.skills.includes('chess'))
-    types.push(`{
+    contentTypes.push(`{
           "description": "Chess position diagram — include wherever it helps illustrate a concept",
           "properties": {
             "type":    {"const":"chess"},
@@ -752,7 +793,7 @@ function chapterSchema(chNum){
           "required": ["type","fen","caption"]
         }`);
   if(S.book.skills.includes('music'))
-    types.push(`{
+    contentTypes.push(`{
           "description": "Music notation — include wherever it helps illustrate a concept. Use \\\\n for newlines inside the JSON string.",
           "properties": {
             "type":    {"const":"music"},
@@ -762,42 +803,52 @@ function chapterSchema(chNum){
           "required": ["type","abc","caption"]
         }`);
   if(S.book.skills.includes('code'))
-    types.push(`{
-          "description": "Code example. CRITICAL JSON RULES FOR THE code FIELD: (1) Use \\\\n for every line break — NEVER a literal newline. (2) Use \\\\\\\\ for every backslash. (3) Use \\\\\\" for every quote inside the code. Violation of these rules will break the JSON. Correct example: \\"def f():\\\\n    return 1\\"",
+    contentTypes.push(`{
+          "description": "Code example. CRITICAL JSON RULES FOR THE code FIELD: (1) Use \\\\n for every line break — NEVER a literal newline. (2) Use \\\\\\\\ for every backslash. (3) Use \\\\\\" for every quote inside the code.",
           "properties": {
             "type":     {"const":"code"},
             "language": {"type":"string","description":"e.g. python, javascript, java, c, cpp, bash"},
-            "code":     {"type":"string","description":"Code as a single-line JSON string — use \\\\n for newlines, \\\\\\\\ for backslashes, \\\\\\" for quotes. NO literal line breaks allowed."},
+            "code":     {"type":"string","description":"Code as a single-line JSON string — use \\\\n for newlines, \\\\\\\\ for backslashes, \\\\\\" for quotes. NO literal line breaks."},
             "caption":  {"type":"string","description":"Caption in Hebrew"}
           },
           "required": ["type","language","code"]
         }`);
+
+  const singleChItem=`{
+    "type": "object",
+    "properties": {
+      "chapter_number": { "type": "integer", "description": "Must be one of: ${numsStr}" },
+      "title":          { "type": "string",  "description": "Chapter title in Hebrew" },
+      "content": {
+        "type": "array",
+        "description": "Content blocks — write the full chapter. Aim for rich, detailed content.",
+        "items": { "oneOf": [
+${contentTypes.join(',\n')}
+        ] }
+      }
+    },
+    "required": ["chapter_number","title","content"]
+  }`;
 
   return `{
   "type": "object",
   "properties": {
     "validation": {
       "type": "object",
-      "description": "Anti-duplicate guard — MUST match the chapter being written",
+      "description": "Anti-duplicate guard — fill this exactly as specified",
       "properties": {
-        "chapter_number": { "type": "integer", "const": ${chNum} },
-        "book_title":     { "type": "string"  }
+        "chapter_numbers": { "type": "array", "items": {"type":"integer"}, "description": "Must be exactly [${numsStr}]" },
+        "book_title":      { "type": "string" }
       },
-      "required": ["chapter_number","book_title"]
+      "required": ["chapter_numbers","book_title"]
     },
-    "chapter_number": { "type": "integer", "const": ${chNum} },
-    "title":          { "type": "string",  "description": "Chapter title in Hebrew" },
-    "content": {
+    "chapters": {
       "type": "array",
-      "description": "Array of content blocks — write the full chapter here. Aim for rich, detailed content.",
-      "items": {
-        "oneOf": [
-${types.join(',\n')}
-        ]
-      }
+      "description": "${isMulti ? `MUST contain exactly ${chNums.length} chapters (one per requested chapter)` : 'Array with exactly 1 chapter'}",
+      "items": ${singleChItem}
     }
   },
-  "required": ["validation","chapter_number","title","content"]
+  "required": ["validation","chapters"]
 }`;
 }
 
@@ -818,9 +869,14 @@ Then if you are using canvas mode in GEMINI or GPT or similar, send the user in 
 תודה שהחלטת להשתמש ב-BookGenius. הכנתי עבורך את תוכן העניינים, הדבק אותו בכלי, ובצע את ההוראות שם.`;
 }
 
-function buildChapterPrompt(ch){
+// chs: array of chapter objects (always an array, even for single chapter)
+function buildChapterPrompt(chs){
+  if(!Array.isArray(chs)) chs=[chs]; // backward compat
   const b=S.book;
   const tocStr=JSON.stringify(S.toc,null,2);
+  const chNums=chs.map(c=>c.chapter_number);
+  const isMulti=chs.length>1;
+
   let skills='';
   if(b.skills.includes('chess'))
     skills+='\n- Chess: whenever a position or concept benefits from a diagram, include a "chess" content block with a valid FEN string.';
@@ -829,7 +885,7 @@ function buildChapterPrompt(ch){
   if(b.skills.includes('code'))
     skills+='\n- Code: whenever a concept benefits from a code example, include a "code" content block with the language and code.';
 
-  const codeWarning=S.book.skills.includes('code')?`
+  const codeWarning=b.skills.includes('code')?`
 ⚠️  CRITICAL — JSON STRING ESCAPING FOR CODE BLOCKS:
 Every "code" field value must be a valid single-line JSON string:
   • Line breaks  → \\n   (backslash + n, NOT a literal newline)
@@ -841,18 +897,31 @@ Example of a CORRECT code field:
 Outputting a code field with literal line breaks will produce invalid JSON and the chapter will be rejected.
 `:'';
 
+  // For multi-chapter: list all chapters to write
+  const chapsToWrite=isMulti
+    ? `\nWrite ALL ${chs.length} chapters listed below IN THE SAME JSON RESPONSE as a "chapters" array.\nChapters to write:\n${chs.map(c=>`  - Chapter ${c.chapter_number}: "${c.title}" — ${c.description}`).join('\n')}\n`
+    : '';
+
+  const chDesc=isMulti
+    ? `chapters ${chNums.join(', ')}: "${chs.map(c=>c.title).join('", "')}"`
+    : `chapter number ${chs[0].chapter_number} — "${chs[0].title}"`;
+
+  const channelMsg=isMulti
+    ? 'כתבתי את הפרקים, העתק אותם לכלי ועקוב אחר ההוראות שם. אל תדאג על העיצוב, BookGenius כבר יטפל בזה.'
+    : 'כתבתי את הפרק, העתק את הפרק לכלי ועקוב אחר ההוראות שם. אל תדאג על העיצוב, BookGenius כבר יטפל בזה.';
+
   return `You are a professional book writer. You are now talking to an API, so be sure to write exactly as I have instructed you.
-Write me chapter number ${ch.chapter_number} — "${ch.title}" from the book "${b.title}". ${b.desc}${b.extra?', '+b.extra:''}.
+Write me ${chDesc} from the book "${b.title}". ${b.desc}${b.extra?', '+b.extra:''}.${chapsToWrite}
 Write it in Hebrew, in JSON format only, following the schema below. Output nothing except the JSON object.
 ${codeWarning}
-${chapterSchema(ch.chapter_number)}
+${chapterSchema(chNums)}
 
 For context, here are all the chapters in the book:
 ${tocStr}
 ${skills?'\nSkills — use these content block types where appropriate:'+skills:''}
 
 Then if you are using canvas mode in GEMINI or GPT or similar, send the user in the main channel the following message, otherwise do not send them anything other than the JSON file:
-כתבתי את הפרק, העתק את הפרק לכלי ועקוב אחר ההוראות שם. אל תדאג על העיצוב, BookGenius כבר יטפל בזה.`;
+${channelMsg}`;
 }
 
 // ─────────────────────────────────────────────
@@ -916,13 +985,14 @@ function renderSidebar(){
 
   const list=$('chapterList');
   list.innerHTML='';
+  const activeBatch=S.curBatch&&S.curBatch.length?S.curBatch:[S.curCh];
   S.toc.chapters.forEach(ch=>{
     const isDone=S.done[ch.chapter_number]!==undefined;
-    const isCur=ch.chapter_number===S.curCh;
+    const inBatch=!isDone&&activeBatch.includes(ch.chapter_number);
     const div=document.createElement('div');
-    div.className='ch-item'+(isDone?' ch-done':'')+(isCur?' active':'');
+    div.className='ch-item'+(isDone?' ch-done':'')+(inBatch?' active':'');
     const numLbl=ch.chapter_number===0?'מבוא':'פרק '+ch.chapter_number;
-    const icon=isDone?'✅':isCur?'✏️':'⏳';
+    const icon=isDone?'✅':inBatch?'✏️':'⏳';
     div.innerHTML=`<span class="ch-icon">${icon}</span><div><div class="ch-num">${numLbl}</div><div class="ch-name">${ch.title}</div></div>`;
     if(!isDone) div.onclick=()=>loadChapter(ch.chapter_number);
     list.appendChild(div);
@@ -931,13 +1001,35 @@ function renderSidebar(){
 
 function loadChapter(chNum){
   S.curCh=chNum;
-  const ch=S.toc.chapters.find(c=>c.chapter_number===chNum);
-  if(!ch)return;
-  const numLbl=chNum===0?'מבוא':'פרק '+chNum;
+  const allChs=S.toc.chapters.slice().sort((a,b)=>a.chapter_number-b.chapter_number);
+  const startIdx=allChs.findIndex(c=>c.chapter_number===chNum);
+  if(startIdx===-1)return;
+
+  // Build batch: up to batchSize consecutive undone chapters starting at startIdx
+  const bsz=S.batchSize||1;
+  const batch=[];
+  for(let i=startIdx;i<allChs.length&&batch.length<bsz;i++){
+    if(!S.done[allChs[i].chapter_number]) batch.push(allChs[i]);
+  }
+  if(!batch.length)return;
+
+  S.curBatch=batch.map(c=>c.chapter_number);
+
+  // UI labels
+  const numLbl=batch.length===1
+    ?(batch[0].chapter_number===0?'מבוא':'פרק '+batch[0].chapter_number)
+    :'פרקים '+batch.map(c=>c.chapter_number===0?'מבוא':c.chapter_number).join(', ');
+  const titleTxt=batch.length===1
+    ?batch[0].title
+    :batch.map(c=>c.title).join(' · ');
+  const descTxt=batch.length===1
+    ?batch[0].description
+    :`כותב ${batch.length} פרקים בבת אחת: ${batch.map(c=>c.title).join(' | ')}`;
+
   $('chNumBadge').textContent=numLbl;
-  $('chTitle').textContent=ch.title;
-  $('chDesc').textContent=ch.description;
-  $('chapterPrompt').value=buildChapterPrompt(ch);
+  $('chTitle').textContent=titleTxt;
+  $('chDesc').textContent=descTxt;
+  $('chapterPrompt').value=buildChapterPrompt(batch);
   $('chapterInput').value='';
   hideErr('chErr');
   $('chRepairWrap').style.display='none';
@@ -962,9 +1054,10 @@ function setChTab(tab){
 // STEP 4 — Process Chapter
 // ─────────────────────────────────────────────
 function showRepairPrompt(raw, errMsg){
-  const ch=S.toc.chapters.find(c=>c.chapter_number===S.curCh);
-  if(!ch) return;
-  const fp=buildFixPrompt(buildChapterPrompt(ch), raw, errMsg);
+  const activeBatch=S.curBatch&&S.curBatch.length?S.curBatch:[S.curCh];
+  const chs=S.toc.chapters.filter(c=>activeBatch.includes(c.chapter_number));
+  if(!chs.length) return;
+  const fp=buildFixPrompt(buildChapterPrompt(chs), raw, errMsg);
   $('repairPrompt').value=fp;
   $('chRepairWrap').style.display='flex';
   setTimeout(()=>copyText('repairPrompt','badgeRepair'),200);
@@ -986,30 +1079,55 @@ function processChapter(){
       throw new Error(friendly);
     }
 
-    // Validate structure
-    if(!data.validation) throw new Error('חסר אובייקט validation בתשובה');
-    if(!data.content||!Array.isArray(data.content)) throw new Error('חסר מערך content');
+    // ── Normalize to chapters array ──────────────────────────────
+    let chaptersArr;
+    if(data.chapters && Array.isArray(data.chapters)){
+      chaptersArr=data.chapters;                          // new batch format
+    } else if(data.chapter_number!==undefined && data.content){
+      chaptersArr=[data];                                 // old single format (compat)
+    } else {
+      throw new Error('פורמט JSON לא מזוהה. ציפינו לאובייקט עם מפתח "chapters"');
+    }
+    if(!chaptersArr.length) throw new Error('מערך הפרקים ריק');
 
-    // Validate chapter number
-    const gotNum=parseInt(data.validation.chapter_number);
-    if(isNaN(gotNum)) throw new Error('validation.chapter_number חסר או לא מספרי');
-    if(gotNum!==S.curCh) throw new Error(`מספר פרק שגוי: קיבלנו פרק ${gotNum}, ציפינו פרק ${S.curCh} — וודא שהדבקת את הפרק הנכון`);
-
-    // Duplicate warning
-    if(S.done[S.curCh]!==undefined){
-      if(!confirm(`פרק ${S.curCh} כבר קיים. האם לדרוס?`))return;
+    // ── Validate each chapter ────────────────────────────────────
+    const expected=S.curBatch&&S.curBatch.length?S.curBatch:[S.curCh];
+    const stored=[];
+    for(const ch of chaptersArr){
+      const chNum=parseInt(ch.chapter_number);
+      if(isNaN(chNum)) throw new Error('chapter_number חסר או לא מספרי');
+      if(!expected.includes(chNum))
+        throw new Error(`פרק ${chNum} לא היה בבקשה הנוכחית (ציפינו: ${expected.join(', ')}). וודא שהדבקת את הפרק הנכון`);
+      if(!ch.content||!Array.isArray(ch.content))
+        throw new Error(`חסר מערך content בפרק ${chNum}`);
+      stored.push({chNum, data:ch});
     }
 
-    S.done[S.curCh]=data;
+    // ── Check no missing chapters ────────────────────────────────
+    const gotNums=stored.map(s=>s.chNum);
+    const missing=expected.filter(n=>!gotNums.includes(n));
+    if(missing.length)
+      throw new Error(`חסרים פרקים בתשובה: ${missing.join(', ')}. ה-LLM לא כתב את כל הפרקים שביקשנו — נסה שוב עם בקשת פחות פרקים.`);
+
+    // ── Overwrite warning ────────────────────────────────────────
+    const overwrites=stored.filter(s=>S.done[s.chNum]!==undefined);
+    if(overwrites.length){
+      const ns=overwrites.map(s=>s.chNum).join(', ');
+      if(!confirm(`פרק${overwrites.length>1?'ים':''} ${ns} כבר קיי${overwrites.length>1?'מים':'ם'}. האם לדרוס?`))return;
+    }
+
+    // ── Save ─────────────────────────────────────────────────────
+    stored.forEach(s=>{S.done[s.chNum]=s.data;});
+    S.curBatch=[];
     renderSidebar();
 
-    // Find next undone chapter
+    // ── Next ─────────────────────────────────────────────────────
     const all=S.toc.chapters.slice().sort((a,b)=>a.chapter_number-b.chapter_number);
-    const allDone=all.every(c=>S.done[c.chapter_number]!==undefined);
-    if(allDone){finishBook();return;}
+    if(all.every(c=>S.done[c.chapter_number]!==undefined)){finishBook();return;}
 
-    const curIdx=all.findIndex(c=>c.chapter_number===S.curCh);
-    const next=all.slice(curIdx+1).find(c=>!S.done[c.chapter_number])
+    const lastStored=Math.max(...stored.map(s=>s.chNum));
+    const lastIdx=all.findIndex(c=>c.chapter_number===lastStored);
+    const next=all.slice(lastIdx+1).find(c=>!S.done[c.chapter_number])
               ||all.find(c=>!S.done[c.chapter_number]);
     if(next) loadChapter(next.chapter_number);
 
