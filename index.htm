@@ -1,1236 +1,1051 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BookGenius 2.0 - יוצר הספרים</title>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Font Awesome -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
-    
-    <!-- Prism.js for code highlighting -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js" defer></script>
-    
-    <!-- abcjs for music notation -->
-    <script src="https://cdn.jsdelivr.net/npm/abcjs@6.4.0/dist/abcjs-basic-min.js"></script>
-    
-    <style>
-        body {
-            font-family: 'Heebo', sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-            min-height: 100vh;
-        }
-        
-        /* Step animations */
-        .step-panel {
-            display: none;
-        }
-        .step-panel.active {
-            display: flex;
-            animation: slideUp 0.4s ease-out;
-        }
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(15px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        /* Glass panel */
-        .glass {
-            background: rgba(255, 255, 255, 0.97);
-            backdrop-filter: blur(20px);
-            box-shadow: 0 25px 50px rgba(0,0,0,0.3);
-        }
-        
-        /* Gradient button */
-        .btn-indigo {
-            background: linear-gradient(135deg, #4f46e5, #7c3aed);
-            transition: all 0.3s ease;
-        }
-        .btn-indigo:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(79, 70, 229, 0.4);
-        }
-        
-        /* Prompt textarea styling */
-        .prompt-box {
-            background: #1e1e2e;
-            color: #a6e3a1;
-            font-family: 'Courier New', monospace;
-            border: 1px solid #313244;
-        }
-        .prompt-box:focus {
-            outline: 2px solid #89b4fa;
-        }
-        
-        /* Chapter list items */
-        .chapter-item {
-            transition: all 0.2s ease;
-            cursor: pointer;
-        }
-        .chapter-item:hover {
-            background: #f5f3ff;
-        }
-        .chapter-item.active {
-            background: #eef2ff;
-            border-color: #4f46e5;
-        }
-        .chapter-item.done {
-            border-color: #10b981;
-            background: #f0fdf4;
-        }
-        
-        /* Chess board */
-        .chess-board-container {
-            display: inline-block;
-            margin: 1rem auto;
-            border: 3px solid #8b6914;
-            border-radius: 4px;
-            overflow: hidden;
-        }
-        
-        /* Book content styles */
-        .book-content p {
-            margin-bottom: 1rem;
-            line-height: 1.9;
-            text-align: justify;
-        }
-        .book-content h3 {
-            font-size: 1.2rem;
-            font-weight: 700;
-            margin: 1.5rem 0 0.75rem;
-            color: #1e40af;
-        }
-        
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #f1f5f9; }
-        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
-        
-        /* Skill badge */
-        .skill-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 14px;
-            border-radius: 9999px;
-            border: 2px solid;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-weight: 500;
-            font-size: 0.875rem;
-        }
-        .skill-badge.chess { border-color: #854d0e; color: #854d0e; }
-        .skill-badge.chess.selected { background: #854d0e; color: white; }
-        .skill-badge.music { border-color: #6d28d9; color: #6d28d9; }
-        .skill-badge.music.selected { background: #6d28d9; color: white; }
-        .skill-badge.code { border-color: #0f766e; color: #0f766e; }
-        .skill-badge.code.selected { background: #0f766e; color: white; }
-        
-        /* Print styles */
-        @media print {
-            body { background: white !important; }
-            .no-print { display: none !important; }
-            .glass { box-shadow: none !important; }
-            .print-page-break { page-break-before: always; }
-            .book-chapter { page-break-inside: avoid; }
-        }
-        
-        /* abcjs music override for RTL */
-        .abcjs-container {
-            direction: ltr;
-            text-align: center;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BookGenius 2.0</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/abcjs@6/dist/abcjs-basic-min.js"></script>
+<style>
+:root {
+  --bg:       #0b0b15;
+  --surface:  #111120;
+  --card:     #171728;
+  --border:   #252540;
+  --border2:  #32325a;
+  --gold:     #e8b923;
+  --gold-glow:rgba(232,185,35,.18);
+  --gold-dim: rgba(232,185,35,.08);
+  --text:     #ddddf0;
+  --muted:    #6868a0;
+  --green:    #1de98b;
+  --red:      #ff4d6d;
+  --sidebar-w:210px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Heebo',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  display:flex;align-items:flex-start;justify-content:center;
+  padding:2rem 1rem 4rem;
+  background-image:
+    radial-gradient(ellipse 70% 50% at 15% 10%,rgba(90,50,200,.07) 0%,transparent 60%),
+    radial-gradient(ellipse 50% 40% at 85% 85%,rgba(232,185,35,.05) 0%,transparent 60%);
+}
+.app{
+  width:100%;max-width:1050px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:20px;overflow:hidden;
+  box-shadow:0 40px 80px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.03) inset;
+}
+/* Header */
+.app-header{
+  background:linear-gradient(135deg,#151528,#0f0f1f);
+  border-bottom:1px solid var(--border);
+  padding:16px 26px;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-icon{
+  width:40px;height:40px;
+  background:linear-gradient(135deg,var(--gold),#f5d060);
+  border-radius:10px;display:flex;align-items:center;justify-content:center;
+  color:#0b0b15;font-size:17px;flex-shrink:0;
+  box-shadow:0 4px 14px rgba(232,185,35,.35);
+}
+.logo h1{font-size:1.15rem;font-weight:900;letter-spacing:-.01em}
+.logo p{font-size:.68rem;color:var(--muted);margin-top:1px}
+/* Step bar */
+.steps-bar{
+  background:var(--card);border-bottom:1px solid var(--border);
+  padding:14px 28px;display:flex;align-items:center;gap:6px;
+  overflow-x:auto;scrollbar-width:none;
+}
+.steps-bar::-webkit-scrollbar{display:none}
+.sdot{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:5px}
+.sdot-circle{
+  width:28px;height:28px;border-radius:50%;
+  border:2px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;color:var(--muted);transition:all .3s;
+}
+.sdot-label{font-size:10px;color:var(--muted);white-space:nowrap;transition:color .3s}
+.sdot.active .sdot-circle{border-color:var(--gold);color:var(--gold);background:var(--gold-dim)}
+.sdot.active .sdot-label{color:var(--gold)}
+.sdot.done .sdot-circle{border-color:var(--green);background:rgba(29,233,139,.08);color:var(--green)}
+.sdot.done .sdot-label{color:var(--green)}
+.sline{flex:1;height:1px;background:var(--border);min-width:18px;transition:background .3s}
+.sline.done{background:rgba(29,233,139,.3)}
+/* Panels */
+.panel{display:none;flex-direction:column}
+.panel.active{display:flex;animation:panelIn .35s cubic-bezier(.25,.46,.45,.94)}
+@keyframes panelIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+/* Forms */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:600px){.form-grid{grid-template-columns:1fr}}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{
+  font-size:.72rem;font-weight:800;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.07em;
+}
+.field input,.field textarea{
+  background:var(--card);border:1.5px solid var(--border);
+  border-radius:10px;padding:10px 14px;
+  color:var(--text);font-family:'Heebo',sans-serif;font-size:.9rem;
+  outline:none;resize:none;
+  transition:border-color .2s,box-shadow .2s;
+}
+.field input:focus,.field textarea:focus{
+  border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-dim);
+}
+.field input::placeholder,.field textarea::placeholder{color:var(--muted)}
+/* Buttons */
+.btn{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:10px 20px;border-radius:10px;
+  font-family:'Heebo',sans-serif;font-size:.88rem;font-weight:700;
+  cursor:pointer;border:none;transition:all .2s;white-space:nowrap;
+  text-decoration:none;
+}
+.btn-primary{
+  background:linear-gradient(135deg,var(--gold),#f5d060);color:#0b0b15;
+  box-shadow:0 4px 14px rgba(232,185,35,.25);
+}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(232,185,35,.4)}
+.btn-ghost{background:transparent;color:var(--muted);border:1.5px solid var(--border)}
+.btn-ghost:hover{color:var(--text);border-color:var(--border2)}
+.btn-dark{background:var(--card);color:var(--text);border:1.5px solid var(--border)}
+.btn-dark:hover{border-color:var(--gold);color:var(--gold)}
+.btn-green{background:rgba(29,233,139,.1);color:var(--green);border:1.5px solid rgba(29,233,139,.3)}
+.btn-green:hover{background:rgba(29,233,139,.18)}
+/* Skill badges */
+.skill-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:7px 16px;border-radius:50px;border:1.5px solid var(--border);
+  color:var(--muted);font-size:.83rem;font-weight:600;
+  cursor:pointer;background:transparent;
+  font-family:'Heebo',sans-serif;transition:all .2s;
+}
+.skill-badge:hover{border-color:var(--gold);color:var(--gold)}
+.skill-badge.selected{background:var(--gold-dim);border-color:var(--gold);color:var(--gold)}
+/* Toggle */
+.toggle-row{display:flex;align-items:center;gap:12px}
+.toggle-sw{position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;direction:ltr}
+.toggle-sw input{opacity:0;width:0;height:0}
+.toggle-track{
+  position:absolute;inset:0;background:var(--border);border-radius:24px;
+  cursor:pointer;transition:background .2s;
+}
+.toggle-track::before{
+  content:'';position:absolute;
+  width:18px;height:18px;left:3px;bottom:3px;
+  background:white;border-radius:50%;transition:transform .2s;
+}
+.toggle-sw input:checked+.toggle-track{background:var(--gold)}
+.toggle-sw input:checked+.toggle-track::before{transform:translateX(20px)}
+.toggle-label{font-size:.88rem;font-weight:600;cursor:pointer;user-select:none}
+/* Prompt / Paste boxes */
+.prompt-box{
+  background:#07070f;border:1px solid var(--border);border-radius:12px;
+  padding:16px;color:#a0e8a0;
+  font-family:'Fira Code','Courier New',monospace;font-size:.76rem;line-height:1.8;
+  resize:none;width:100%;outline:none;transition:border-color .2s;
+}
+.prompt-box:focus{border-color:var(--gold)}
+.paste-box{
+  background:var(--card);border:2px dashed var(--border);border-radius:12px;
+  padding:16px;color:var(--text);
+  font-family:'Fira Code','Courier New',monospace;font-size:.76rem;
+  resize:none;width:100%;outline:none;transition:border-color .2s,border-style .2s;
+}
+.paste-box:focus{border-color:var(--gold);border-style:solid}
+.paste-box::placeholder{color:var(--muted)}
+/* Tabs */
+.tab-bar{display:flex;border-bottom:1px solid var(--border)}
+.tab-btn{
+  padding:9px 18px;font-size:.83rem;font-weight:700;color:var(--muted);
+  border:none;border-bottom:2px solid transparent;background:transparent;
+  cursor:pointer;font-family:'Heebo',sans-serif;transition:all .2s;margin-bottom:-1px;
+}
+.tab-btn.active{color:var(--gold);border-bottom-color:var(--gold)}
+.tab-btn:hover:not(.active){color:var(--text)}
+/* Errors */
+.err-msg{
+  display:none;align-items:flex-start;gap:6px;
+  color:var(--red);font-size:.82rem;margin-top:4px;line-height:1.5;
+}
+.err-msg.show{display:flex}
+.err-msg i{flex-shrink:0;margin-top:2px}
+/* Copy badge */
+.copy-badge{
+  position:absolute;top:10px;left:10px;
+  background:var(--green);color:#07070f;
+  font-size:.68rem;font-weight:800;padding:3px 9px;border-radius:6px;
+  opacity:0;transition:opacity .25s;pointer-events:none;
+}
+.copy-badge.show{opacity:1}
+/* Chapter sidebar */
+.ch-sidebar{
+  width:var(--sidebar-w);flex-shrink:0;
+  border-left:1px solid var(--border);background:#0d0d1a;
+  display:flex;flex-direction:column;
+}
+.ch-sidebar-header{padding:14px 12px;border-bottom:1px solid var(--border)}
+.ch-sidebar-header .lbl{font-size:.68rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+.ch-sidebar-header .prog{font-size:.82rem;color:var(--text);margin-top:4px}
+.ch-list{flex:1;overflow-y:auto}
+.ch-item{
+  padding:10px 12px;border-bottom:1px solid rgba(37,37,64,.5);
+  cursor:pointer;transition:background .15s;
+  display:flex;gap:8px;align-items:flex-start;
+}
+.ch-item:hover{background:var(--card)}
+.ch-item.active{background:var(--gold-dim);border-right:3px solid var(--gold)}
+.ch-item.ch-done{border-right:3px solid rgba(29,233,139,.4);cursor:default}
+.ch-item .ch-icon{font-size:13px;flex-shrink:0;margin-top:1px}
+.ch-item .ch-num{font-size:.67rem;font-weight:800;color:var(--muted);margin-bottom:2px}
+.ch-item .ch-name{font-size:.77rem;color:var(--text);line-height:1.4}
+.ch-sidebar-footer{padding:10px;border-top:1px solid var(--border);flex-shrink:0}
+/* Book preview */
+.book-preview{
+  background:#f9f8ff;color:#18181e;direction:rtl;
+  padding:3.5rem;overflow-y:auto;max-height:73vh;
+  scroll-behavior:smooth;
+}
+.book-preview h1{font-size:2.3rem;font-weight:900;text-align:center;margin-bottom:.4rem;line-height:1.2;color:#110d33}
+.bk-subtitle{text-align:center;color:#666;margin-bottom:2.5rem;font-size:.95rem}
+.bk-chapter{margin-top:3.5rem;padding-top:2.5rem;border-top:3px solid #ece8ff}
+.bk-ch-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.12em;color:#7c68d0;font-weight:800;margin-bottom:.25rem}
+.bk-chapter h2{font-size:1.5rem;font-weight:900;color:#2a1660;margin-bottom:1rem}
+.bk-chapter h3{font-size:1.05rem;font-weight:800;color:#3a22a0;margin:1.4rem 0 .5rem}
+.bk-chapter p{line-height:1.95;margin-bottom:1rem;text-align:justify}
+.toc-entry{display:flex;align-items:baseline;gap:8px;padding:5px 0;font-size:.88rem}
+.toc-num{color:#888;font-size:.76rem;white-space:nowrap}
+.toc-dots{flex:1;border-bottom:1px dotted #ccc}
+.chess-wrap{display:flex;flex-direction:column;align-items:center;margin:1.5rem 0}
+.chess-wrap svg{border:2px solid #8b6914;border-radius:3px;display:block}
+.chess-caption{font-size:.8rem;color:#666;margin-top:7px;font-style:italic;text-align:center}
+.music-wrap{direction:ltr;background:#f3f2ff;border-radius:10px;padding:1rem 1.2rem;margin:1.2rem 0}
+.music-caption{font-size:.8rem;color:#666;margin-top:5px;font-style:italic;text-align:center;direction:rtl}
+.code-wrap{margin:1.5rem 0}
+.code-header{
+  background:#21252e;color:#8892a4;
+  font-family:'Fira Code',monospace;font-size:.71rem;
+  padding:7px 14px;border-radius:10px 10px 0 0;
+  display:flex;justify-content:space-between;align-items:center;direction:ltr;
+}
+.code-header+pre{border-radius:0 0 10px 10px!important;margin:0!important}
+.book-preview pre{border-radius:10px;overflow-x:auto}
+.book-preview pre code{font-family:'Fira Code',monospace;font-size:.8rem}
+/* Scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+/* Section title */
+.sec-title{font-size:1.35rem;font-weight:900;letter-spacing:-.02em}
+.sec-sub{color:var(--muted);font-size:.85rem;margin-top:5px}
+/* Print */
+@media print{
+  body{background:white!important;padding:0}
+  .book-preview{max-height:none;border-radius:0;background:white}
+  .bk-chapter{page-break-before:always}
+  pre{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  svg{max-width:100%}
+}
+</style>
 </head>
-<body class="flex items-center justify-center min-h-screen p-4 py-8">
+<body>
+<div class="app">
 
-<div class="glass w-full max-w-5xl rounded-3xl overflow-hidden" style="min-height: 650px;">
-    
-    <!-- Header -->
-    <header class="bg-gradient-to-r from-indigo-600 to-violet-600 p-5 flex justify-between items-center">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white text-lg">
-                <i class="fas fa-book-open"></i>
-            </div>
-            <div>
-                <h1 class="text-xl font-bold text-white">BookGenius</h1>
-                <p class="text-indigo-200 text-xs">v2.0 – יוצר הספרים</p>
-            </div>
-        </div>
-        <div class="flex items-center gap-4">
-            <span id="stepLabel" class="text-indigo-200 text-sm"></span>
-            <button onclick="resetApp()" class="text-white/70 hover:text-white transition text-sm flex items-center gap-1">
-                <i class="fas fa-redo text-xs"></i> איפוס
-            </button>
-        </div>
-    </header>
-    
-    <!-- Progress bar -->
-    <div class="h-1 bg-indigo-100">
-        <div id="progressBar" class="h-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-500" style="width:0%"></div>
+<!-- HEADER -->
+<header class="app-header">
+  <div class="logo">
+    <div class="logo-icon"><i class="fas fa-book-open"></i></div>
+    <div>
+      <h1>BookGenius</h1>
+      <p>v2.0 — יוצר ספרים בעזרת AI</p>
     </div>
+  </div>
+  <button onclick="resetApp()" class="btn btn-ghost" style="padding:7px 14px;font-size:.8rem">
+    <i class="fas fa-redo" style="font-size:.72rem"></i> איפוס
+  </button>
+</header>
 
-    <!-- Main content -->
-    <main class="p-0">
-    
-        <!-- ===== STEP 1: Book Setup ===== -->
-        <div id="step1" class="step-panel flex-col p-8 space-y-6">
-            <div class="flex flex-col items-center text-center space-y-3 pb-2">
-                <div class="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 text-3xl">
-                    <i class="fas fa-book-open"></i>
-                </div>
-                <h2 class="text-3xl font-black text-gray-800">BookGenius 2.0</h2>
-                <p class="text-gray-500 max-w-lg">מלא את פרטי הספר שלך, ואנו ניצור עבורך ספר שלם בעזרת בינה מלאכותית.</p>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div class="space-y-1">
-                    <label class="text-sm font-semibold text-gray-700">נושא/כותרת הספר *</label>
-                    <input id="s1_title" type="text" class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-indigo-400 outline-none transition" placeholder="למשל: מבוא לשחמט">
-                </div>
-                <div class="space-y-1">
-                    <label class="text-sm font-semibold text-gray-700">מספר פרקים *</label>
-                    <input id="s1_chapters" type="number" min="1" max="50" value="10" class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-indigo-400 outline-none transition">
-                </div>
-            </div>
-            
-            <div class="space-y-1">
-                <label class="text-sm font-semibold text-gray-700">פרטי הספר *</label>
-                <textarea id="s1_desc" rows="3" class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-indigo-400 outline-none transition resize-none" placeholder="על מה הספר? מי קהל היעד? מה מטרתו?"></textarea>
-            </div>
-            
-            <div class="space-y-1">
-                <label class="text-sm font-semibold text-gray-700">מידע נוסף / הנחיות כתיבה</label>
-                <textarea id="s1_extra" rows="2" class="w-full px-4 py-2.5 border-2 border-gray-200 rounded-xl focus:border-indigo-400 outline-none transition resize-none" placeholder="סגנון כתיבה, טון, הנחיות מיוחדות..."></textarea>
-            </div>
-            
-            <div class="flex flex-wrap gap-3 items-center">
-                <span class="text-sm font-semibold text-gray-700">כישורים מיוחדים:</span>
-                <button type="button" id="skill_chess" onclick="toggleSkill('chess')" class="skill-badge chess">
-                    <i class="fas fa-chess"></i> שחמט
-                </button>
-                <button type="button" id="skill_music" onclick="toggleSkill('music')" class="skill-badge music">
-                    <i class="fas fa-music"></i> תווים
-                </button>
-                <button type="button" id="skill_code" onclick="toggleSkill('code')" class="skill-badge code">
-                    <i class="fas fa-code"></i> קוד
-                </button>
-            </div>
-            
-            <div class="flex items-center gap-3">
-                <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" id="s1_intro" class="sr-only peer" onchange="saveState()">
-                    <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-indigo-600 after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-[-20px]"></div>
-                    <span class="mr-3 text-sm font-semibold text-gray-700">כלול פרק מבוא</span>
-                </label>
-            </div>
-            
-            <div class="flex justify-end pt-2">
-                <button onclick="step1Submit()" class="btn-indigo text-white px-8 py-3 rounded-xl font-bold shadow-lg flex items-center gap-2">
-                    צור פרומפט לתוכן עניינים <i class="fas fa-arrow-left"></i>
-                </button>
-            </div>
-        </div>
-
-        <!-- ===== STEP 2: TOC Prompt ===== -->
-        <div id="step2" class="step-panel flex-col p-8 space-y-5">
-            <div>
-                <h2 class="text-2xl font-bold text-gray-800">📋 פרומפט לתוכן עניינים</h2>
-                <p class="text-gray-500 mt-1">הפרומפט הבא הועתק ללוח הגזירים. שלח אותו ל-LLM (ChatGPT, Gemini, Claude וכד').</p>
-            </div>
-            
-            <div class="relative">
-                <textarea id="tocPrompt" readonly class="prompt-box w-full h-72 p-4 rounded-xl text-sm resize-none" dir="ltr"></textarea>
-                <div id="badge2" class="absolute top-3 left-3 bg-green-500 text-white text-xs px-2 py-1 rounded-lg opacity-0 transition-opacity duration-300">✓ הועתק</div>
-            </div>
-            
-            <div class="flex justify-between items-center">
-                <button onclick="copyText('tocPrompt','badge2')" class="flex items-center gap-2 bg-gray-800 text-white px-5 py-2.5 rounded-xl hover:bg-gray-900 transition">
-                    <i class="fas fa-copy"></i> העתק שוב
-                </button>
-                <button onclick="goStep(3)" class="btn-indigo text-white px-7 py-2.5 rounded-xl font-bold shadow-md flex items-center gap-2">
-                    העתקתי, הדבק תשובה <i class="fas fa-arrow-left"></i>
-                </button>
-            </div>
-        </div>
-
-        <!-- ===== STEP 3: Paste TOC JSON ===== -->
-        <div id="step3" class="step-panel flex-col p-8 space-y-5">
-            <div>
-                <h2 class="text-2xl font-bold text-gray-800">📥 הדבקת תוכן העניינים</h2>
-                <p class="text-gray-500 mt-1">הדבק כאן את ה-JSON שקיבלת מה-LLM.</p>
-            </div>
-            
-            <textarea id="tocInput" class="w-full h-72 p-4 border-2 border-dashed border-gray-300 rounded-xl focus:border-indigo-400 outline-none font-mono text-sm resize-none transition" placeholder="הדבק את ה-JSON כאן..." dir="ltr"></textarea>
-            <p id="tocError" class="text-red-500 text-sm hidden"><i class="fas fa-exclamation-circle ml-1"></i><span id="tocErrorMsg"></span></p>
-            
-            <div class="flex justify-between items-center">
-                <button onclick="goStep(2)" class="text-gray-500 hover:text-gray-700 flex items-center gap-1">
-                    <i class="fas fa-arrow-right"></i> חזור
-                </button>
-                <button onclick="processTOC()" class="btn-indigo text-white px-7 py-2.5 rounded-xl font-bold shadow-md flex items-center gap-2">
-                    עבד ותחיל כתיבה <i class="fas fa-cogs ml-1"></i>
-                </button>
-            </div>
-        </div>
-
-        <!-- ===== STEP 4: Chapter Writing ===== -->
-        <div id="step4" class="step-panel flex-col" style="min-height: 600px;">
-            <div class="flex flex-1" style="min-height: 600px;">
-                
-                <!-- Chapter List Sidebar -->
-                <div class="w-56 bg-gray-50 border-l border-gray-200 flex flex-col" style="min-height: 600px;">
-                    <div class="p-4 border-b border-gray-200">
-                        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">פרקים</p>
-                        <p id="chaptersProgressText" class="text-sm text-gray-700 mt-1"></p>
-                    </div>
-                    <div id="chapterList" class="flex-1 overflow-y-auto p-3 space-y-1.5">
-                        <!-- Chapter items injected here -->
-                    </div>
-                </div>
-                
-                <!-- Main Chapter Area -->
-                <div class="flex-1 flex flex-col p-6 space-y-5">
-                
-                    <!-- Chapter header -->
-                    <div class="flex items-center gap-3">
-                        <span id="chNumBadge" class="bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-1 rounded-full"></span>
-                        <h3 id="chTitle" class="text-xl font-bold text-gray-800"></h3>
-                    </div>
-                    <p id="chDesc" class="text-gray-600 italic text-sm bg-gray-50 p-3 rounded-lg border-r-4 border-gray-300"></p>
-                    
-                    <!-- Sub-step tabs -->
-                    <div class="flex border-b border-gray-200">
-                        <button id="tabPrompt" onclick="setChTab('prompt')" class="px-4 py-2 text-sm font-semibold border-b-2 border-indigo-600 text-indigo-600 transition">
-                            1. שלח לLLM
-                        </button>
-                        <button id="tabPaste" onclick="setChTab('paste')" class="px-4 py-2 text-sm font-semibold border-b-2 border-transparent text-gray-400 transition">
-                            2. הדבק תשובה
-                        </button>
-                    </div>
-                    
-                    <!-- Prompt panel -->
-                    <div id="chPanelPrompt" class="flex-1 flex flex-col gap-3">
-                        <div class="relative flex-1">
-                            <textarea id="chapterPrompt" readonly class="prompt-box w-full h-56 p-4 rounded-xl text-sm resize-none" dir="ltr"></textarea>
-                            <div id="badge5" class="absolute top-3 left-3 bg-green-500 text-white text-xs px-2 py-1 rounded-lg opacity-0 transition-opacity duration-300">✓ הועתק</div>
-                        </div>
-                        <div class="flex justify-between">
-                            <button onclick="copyText('chapterPrompt','badge5')" class="flex items-center gap-2 bg-gray-800 text-white px-5 py-2.5 rounded-xl hover:bg-gray-900 transition text-sm">
-                                <i class="fas fa-copy"></i> העתק פרומפט
-                            </button>
-                            <button onclick="setChTab('paste')" class="btn-indigo text-white px-6 py-2.5 rounded-xl font-bold shadow text-sm flex items-center gap-2">
-                                העתקתי, עבור להדבקה <i class="fas fa-arrow-left"></i>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- Paste panel -->
-                    <div id="chPanelPaste" class="flex-1 flex flex-col gap-3 hidden">
-                        <textarea id="chapterInput" class="w-full h-56 p-4 border-2 border-dashed border-gray-300 rounded-xl focus:border-indigo-400 outline-none font-mono text-sm resize-none transition" placeholder="הדבק את ה-JSON של הפרק כאן..." dir="ltr"></textarea>
-                        <p id="chError" class="text-red-500 text-sm hidden"><i class="fas fa-exclamation-circle ml-1"></i><span id="chErrorMsg"></span></p>
-                        <div class="flex justify-between items-center">
-                            <button onclick="setChTab('prompt')" class="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1">
-                                <i class="fas fa-arrow-right"></i> חזור לפרומפט
-                            </button>
-                            <button onclick="processChapter()" class="btn-indigo text-white px-6 py-2.5 rounded-xl font-bold shadow text-sm flex items-center gap-2">
-                                אשר ועבור לפרק הבא <i class="fas fa-check ml-1"></i>
-                            </button>
-                        </div>
-                    </div>
-                    
-                </div>
-            </div>
-        </div>
-
-        <!-- ===== STEP 5: Book Preview & Download ===== -->
-        <div id="step5" class="step-panel flex-col p-8 space-y-6">
-            <div class="flex justify-between items-start">
-                <div>
-                    <h2 class="text-2xl font-bold text-gray-800">🎉 הספר מוכן!</h2>
-                    <p id="bookSubtitle" class="text-gray-500 mt-1"></p>
-                </div>
-                <div class="flex gap-3">
-                    <button onclick="downloadHTML()" class="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl hover:bg-indigo-700 transition text-sm font-semibold">
-                        <i class="fas fa-download"></i> הורד HTML
-                    </button>
-                    <button onclick="printBook()" class="flex items-center gap-2 bg-gray-800 text-white px-4 py-2 rounded-xl hover:bg-gray-900 transition text-sm font-semibold">
-                        <i class="fas fa-print"></i> הדפס / PDF
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Book preview -->
-            <div id="bookPreview" class="bg-white border border-gray-200 rounded-2xl overflow-y-auto" style="max-height: 70vh;">
-                <!-- Book content rendered here -->
-            </div>
-        </div>
-
-    </main>
+<!-- STEP BAR -->
+<div class="steps-bar">
+  <div class="sdot active" id="sdot1"><div class="sdot-circle">1</div><div class="sdot-label">הגדרה</div></div>
+  <div class="sline" id="sline1"></div>
+  <div class="sdot" id="sdot2"><div class="sdot-circle">2</div><div class="sdot-label">פרומפט TOC</div></div>
+  <div class="sline" id="sline2"></div>
+  <div class="sdot" id="sdot3"><div class="sdot-circle">3</div><div class="sdot-label">קליטת מבנה</div></div>
+  <div class="sline" id="sline3"></div>
+  <div class="sdot" id="sdot4"><div class="sdot-circle">4</div><div class="sdot-label">כתיבת פרקים</div></div>
+  <div class="sline" id="sline4"></div>
+  <div class="sdot" id="sdot5"><div class="sdot-circle">5</div><div class="sdot-label">הספר מוכן</div></div>
 </div>
 
-<script>
-// ====================================================
-// STATE MANAGEMENT
-// ====================================================
-const STORAGE_KEY = 'bookgenius_v2';
+<!-- ══════════ STEP 1 ══════════ -->
+<div id="step1" class="panel" style="padding:32px;gap:22px">
+  <div style="text-align:center;padding-bottom:4px">
+    <p style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:8px">שלב ראשון</p>
+    <h2 class="sec-title">הגדרת הספר</h2>
+    <p class="sec-sub">מלא את הפרטים ואנו ניצור עבורך את כל הפרומפטים</p>
+  </div>
 
-let state = {
-    step: 1,
-    book: {
-        title: '',
-        desc: '',
-        chapterCount: 10,
-        extra: '',
-        skills: [],
-        hasIntro: false
-    },
-    toc: null,        // parsed TOC JSON
-    chapters: {},     // { chapter_number: parsedChapterJSON }
-    currentChNum: 0,  // current chapter_number being worked on
-    chTab: 'prompt'
+  <div class="form-grid">
+    <div class="field">
+      <label>נושא / כותרת הספר *</label>
+      <input type="text" id="s1_title" placeholder="למשל: מבוא לשחמט">
+    </div>
+    <div class="field">
+      <label>מספר פרקים *</label>
+      <input type="number" id="s1_chapters" value="10" min="1" max="50">
+    </div>
+  </div>
+
+  <div class="field">
+    <label>פרטי הספר — על מה הספר? קהל יעד? מטרה? *</label>
+    <textarea id="s1_desc" rows="3" placeholder="תאר את הספר בקצרה..."></textarea>
+  </div>
+
+  <div class="field">
+    <label>מידע נוסף / הנחיות כתיבה (רשות)</label>
+    <textarea id="s1_extra" rows="2" placeholder="סגנון, טון, רמת פירוט, הנחיות מיוחדות..."></textarea>
+  </div>
+
+  <div style="display:flex;align-items:center;flex-wrap:wrap;gap:12px">
+    <span style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">כישורים:</span>
+    <button type="button" id="skill_chess" onclick="toggleSkill('chess')" class="skill-badge"><i class="fas fa-chess"></i> שחמט</button>
+    <button type="button" id="skill_music" onclick="toggleSkill('music')" class="skill-badge"><i class="fas fa-music"></i> תווים</button>
+    <button type="button" id="skill_code"  onclick="toggleSkill('code')"  class="skill-badge"><i class="fas fa-code"></i> קוד</button>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px">
+    <div class="toggle-row">
+      <label class="toggle-sw">
+        <input type="checkbox" id="s1_intro">
+        <span class="toggle-track"></span>
+      </label>
+      <label class="toggle-label" for="s1_intro">כלול פרק מבוא (פרק 0)</label>
+    </div>
+    <button onclick="step1Submit()" class="btn btn-primary" style="padding:12px 28px;font-size:.95rem">
+      צור פרומפט לתוכן עניינים <i class="fas fa-arrow-left"></i>
+    </button>
+  </div>
+</div>
+
+<!-- ══════════ STEP 2 ══════════ -->
+<div id="step2" class="panel" style="padding:32px;gap:20px">
+  <div>
+    <p style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:6px">שלב שני</p>
+    <h2 class="sec-title">📋 פרומפט — תוכן עניינים</h2>
+    <p class="sec-sub">הפרומפט הועתק ללוח הגזירים. שלח ל-ChatGPT, Gemini, Claude או כל LLM.</p>
+  </div>
+  <div style="position:relative">
+    <textarea id="tocPrompt" class="prompt-box" rows="15" readonly dir="ltr"></textarea>
+    <div class="copy-badge" id="badge2">✓ הועתק!</div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+    <button onclick="copyText('tocPrompt','badge2')" class="btn btn-dark"><i class="fas fa-copy"></i> העתק שוב</button>
+    <div style="display:flex;gap:10px">
+      <button onclick="goStep(1)" class="btn btn-ghost"><i class="fas fa-arrow-right"></i> חזור</button>
+      <button onclick="goStep(3)" class="btn btn-primary">קיבלתי תשובה מה-LLM <i class="fas fa-arrow-left"></i></button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ STEP 3 ══════════ -->
+<div id="step3" class="panel" style="padding:32px;gap:20px">
+  <div>
+    <p style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);margin-bottom:6px">שלב שלישי</p>
+    <h2 class="sec-title">📥 קליטת תוכן העניינים</h2>
+    <p class="sec-sub">הדבק את תגובת ה-LLM. הכלי ייחלץ את ה-JSON אוטומטית גם מתוך טקסט.</p>
+  </div>
+  <textarea id="tocInput" class="paste-box" rows="15" placeholder="הדבק את תגובת ה-LLM כאן..." dir="ltr"></textarea>
+  <div class="err-msg" id="tocErr"><i class="fas fa-exclamation-circle"></i><span id="tocErrMsg"></span></div>
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <button onclick="goStep(2)" class="btn btn-ghost"><i class="fas fa-arrow-right"></i> חזור</button>
+    <button onclick="processTOC()" class="btn btn-primary">עבד נתונים ותחיל כתיבה <i class="fas fa-cogs"></i></button>
+  </div>
+</div>
+
+<!-- ══════════ STEP 4 ══════════ -->
+<div id="step4" class="panel" style="flex-direction:row;min-height:600px">
+
+  <!-- Sidebar -->
+  <div class="ch-sidebar">
+    <div class="ch-sidebar-header">
+      <div class="lbl">פרקים</div>
+      <div class="prog" id="chProgText">0 / 0 הושלמו</div>
+    </div>
+    <div class="ch-list" id="chapterList"></div>
+    <div class="ch-sidebar-footer" id="chFooter" style="display:none">
+      <button onclick="finishBook()" class="btn btn-green" style="width:100%;justify-content:center;font-size:.8rem;padding:9px">
+        <i class="fas fa-book"></i> צפה בספר המלא
+      </button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div style="flex:1;display:flex;flex-direction:column;padding:24px 26px;gap:16px;overflow-y:auto">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span id="chNumBadge" style="background:var(--gold-dim);color:var(--gold);font-size:.72rem;font-weight:900;padding:4px 13px;border-radius:20px;border:1px solid rgba(232,185,35,.28)"></span>
+      <h3 id="chTitle" style="font-size:1.1rem;font-weight:900;line-height:1.3"></h3>
+    </div>
+    <p id="chDesc" style="color:var(--muted);font-size:.83rem;font-style:italic;background:var(--card);padding:12px 14px;border-radius:8px;border-right:3px solid var(--border2);line-height:1.75"></p>
+    <div class="tab-bar">
+      <button class="tab-btn active" id="tabPrompt" onclick="setChTab('prompt')">1. שלח ל-LLM</button>
+      <button class="tab-btn"        id="tabPaste"  onclick="setChTab('paste')">2. הדבק תשובה</button>
+    </div>
+    <!-- Prompt panel -->
+    <div id="chPanelPrompt" style="display:flex;flex-direction:column;gap:12px">
+      <div style="position:relative">
+        <textarea id="chapterPrompt" class="prompt-box" rows="12" readonly dir="ltr"></textarea>
+        <div class="copy-badge" id="badge4">✓ הועתק!</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <button onclick="copyText('chapterPrompt','badge4')" class="btn btn-dark" style="font-size:.82rem;padding:9px 16px"><i class="fas fa-copy"></i> העתק פרומפט</button>
+        <button onclick="setChTab('paste')" class="btn btn-primary" style="font-size:.82rem;padding:9px 18px">שלחתי, עבור להדבקה <i class="fas fa-arrow-left"></i></button>
+      </div>
+    </div>
+    <!-- Paste panel -->
+    <div id="chPanelPaste" style="display:none;flex-direction:column;gap:12px">
+      <textarea id="chapterInput" class="paste-box" rows="12" placeholder="הדבק את תגובת ה-LLM לפרק זה..." dir="ltr"></textarea>
+      <div class="err-msg" id="chErr"><i class="fas fa-exclamation-circle"></i><span id="chErrMsg"></span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <button onclick="setChTab('prompt')" class="btn btn-ghost" style="font-size:.82rem;padding:9px 14px"><i class="fas fa-arrow-right"></i> חזור לפרומפט</button>
+        <button onclick="processChapter()" class="btn btn-primary" style="font-size:.82rem;padding:9px 18px"><i class="fas fa-check"></i> אשר ושמור פרק זה</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ STEP 5 ══════════ -->
+<div id="step5" class="panel" style="flex-direction:column">
+  <div style="padding:20px 28px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;border-bottom:1px solid var(--border)">
+    <div>
+      <h2 class="sec-title">🎉 הספר מוכן!</h2>
+      <p id="bkSubtitle" class="sec-sub"></p>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button onclick="goStep(4);setupDashboard();" class="btn btn-ghost" style="font-size:.8rem;padding:8px 14px"><i class="fas fa-edit"></i> ערוך</button>
+      <button onclick="downloadHTML()" class="btn btn-dark" style="font-size:.8rem;padding:8px 14px"><i class="fas fa-download"></i> הורד HTML</button>
+      <button onclick="printBook()" class="btn btn-primary" style="font-size:.8rem;padding:8px 14px"><i class="fas fa-print"></i> הדפס / PDF</button>
+    </div>
+  </div>
+  <div id="bookPreview" class="book-preview"></div>
+</div>
+
+</div><!-- /.app -->
+
+<!-- ============================================================
+     JAVASCRIPT
+     ============================================================ -->
+<script>
+'use strict';
+// ─────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────
+const SK = 'bookgenius_v2';
+let S = {
+  step:1,
+  book:{title:'',desc:'',chapters:10,extra:'',skills:[],intro:false},
+  toc:null,   // parsed TOC JSON
+  done:{},    // {chapter_number: chapterJSON}
+  curCh:0,    // current chapter_number in step4
 };
 
-function saveState() {
-    // Save form values to state
-    if (document.getElementById('s1_title')) {
-        state.book.title = document.getElementById('s1_title').value;
-        state.book.desc = document.getElementById('s1_desc').value;
-        state.book.chapterCount = parseInt(document.getElementById('s1_chapters').value) || 10;
-        state.book.extra = document.getElementById('s1_extra').value;
-        state.book.hasIntro = document.getElementById('s1_intro').checked;
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+// ─────────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────────
+const $  = id => document.getElementById(id);
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function copyText(elId, badgeId){
+  const ta=$(elId); ta.select(); ta.setSelectionRange(0,99999);
+  navigator.clipboard.writeText(ta.value)
+    .then(()=>showBadge(badgeId))
+    .catch(()=>{document.execCommand('copy');showBadge(badgeId);});
+}
+function showBadge(id){
+  const b=$(id); if(!b)return;
+  b.classList.add('show');
+  setTimeout(()=>b.classList.remove('show'),2200);
+}
+function showErr(elId,msgId,msg){$(elId).classList.add('show');$(msgId).textContent=' '+msg;}
+function hideErr(elId){$(elId).classList.remove('show');}
+
+function extractJSON(raw){
+  let s=raw.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
+  const m=s.match(/\{[\s\S]*\}/);
+  if(m) return m[0];
+  throw new Error('לא נמצא JSON תקין בטקסט');
 }
 
-function loadState() {
-    try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            Object.assign(state, parsed);
-            return true;
-        }
-    } catch(e) {}
-    return false;
+// ─────────────────────────────────────────────
+// PERSIST
+// ─────────────────────────────────────────────
+function save(){localStorage.setItem(SK,JSON.stringify(S));}
+function load(){
+  try{const r=localStorage.getItem(SK);if(r){Object.assign(S,JSON.parse(r));return true;}}
+  catch(e){}return false;
+}
+function syncForm(){
+  S.book.title   =$('s1_title').value.trim();
+  S.book.desc    =$('s1_desc').value.trim();
+  S.book.chapters=parseInt($('s1_chapters').value)||10;
+  S.book.extra   =$('s1_extra').value.trim();
+  S.book.intro   =$('s1_intro').checked;
+}
+function restoreForm(){
+  $('s1_title').value   =S.book.title||'';
+  $('s1_desc').value    =S.book.desc||'';
+  $('s1_chapters').value=S.book.chapters||10;
+  $('s1_extra').value   =S.book.extra||'';
+  $('s1_intro').checked =S.book.intro||false;
+  (S.book.skills||[]).forEach(sk=>{const el=$('skill_'+sk);if(el)el.classList.add('selected');});
 }
 
-// ====================================================
+// ─────────────────────────────────────────────
 // NAVIGATION
-// ====================================================
-function goStep(n) {
-    // Hide all
-    document.querySelectorAll('.step-panel').forEach(el => {
-        el.classList.remove('active');
-    });
-    // Show target
-    const el = document.getElementById(`step${n}`);
-    el.classList.add('active');
-    state.step = n;
-    
-    // Update progress bar (5 main steps, but step 4 can have sub-steps)
-    const pct = ((n - 1) / 4) * 100;
-    document.getElementById('progressBar').style.width = pct + '%';
-    
-    // Update step label
-    const labels = ['', 'הגדרת הספר', 'תוכן עניינים', 'קליטת מבנה', 'כתיבת פרקים', 'הספר מוכן'];
-    document.getElementById('stepLabel').textContent = labels[n] || '';
-    
-    saveState();
+// ─────────────────────────────────────────────
+function goStep(n){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  $('step'+n).classList.add('active');
+  S.step=n;
+  for(let i=1;i<=5;i++){
+    const dot=$('sdot'+i);
+    dot.classList.remove('active','done');
+    dot.querySelector('.sdot-circle').innerHTML=i<n?'✓':String(i);
+    if(i<n){dot.classList.add('done');}
+    if(i===n){dot.classList.add('active');}
+    if(i<5)$('sline'+i).classList.toggle('done',i<n);
+  }
+  save();
 }
 
-function resetApp() {
-    if (confirm('לאפס הכל ולהתחיל מחדש?')) {
-        localStorage.removeItem(STORAGE_KEY);
-        location.reload();
-    }
+function resetApp(){
+  if(confirm('לאפס הכל? כל נתוני הספר יימחקו.')){
+    localStorage.removeItem(SK);location.reload();
+  }
 }
 
-// ====================================================
+// ─────────────────────────────────────────────
 // SKILLS
-// ====================================================
-function toggleSkill(skill) {
-    const idx = state.book.skills.indexOf(skill);
-    if (idx === -1) {
-        state.book.skills.push(skill);
-        document.getElementById(`skill_${skill}`).classList.add('selected');
-    } else {
-        state.book.skills.splice(idx, 1);
-        document.getElementById(`skill_${skill}`).classList.remove('selected');
-    }
-    saveState();
+// ─────────────────────────────────────────────
+function toggleSkill(sk){
+  const idx=S.book.skills.indexOf(sk);
+  if(idx===-1){S.book.skills.push(sk);$('skill_'+sk).classList.add('selected');}
+  else{S.book.skills.splice(idx,1);$('skill_'+sk).classList.remove('selected');}
+  save();
 }
 
-// ====================================================
-// STEP 1: Submit
-// ====================================================
-function step1Submit() {
-    const title = document.getElementById('s1_title').value.trim();
-    const desc = document.getElementById('s1_desc').value.trim();
-    if (!title || !desc) {
-        alert('אנא מלא לפחות נושא/כותרת ופרטי הספר');
-        return;
-    }
-    saveState();
-    
-    // Generate TOC prompt
-    const prompt = buildTOCPrompt();
-    document.getElementById('tocPrompt').value = prompt;
-    
-    goStep(2);
-    
-    // Auto copy
-    setTimeout(() => copyText('tocPrompt', 'badge2'), 400);
-}
-
-// ====================================================
-// SCHEMA BUILDERS
-// ====================================================
-function getTOCSchema() {
-    return `{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "BookTableOfContents",
+// ─────────────────────────────────────────────
+// SCHEMAS
+// ─────────────────────────────────────────────
+function tocSchema(){
+  const intro=S.book.intro
+    ?'0 = introduction chapter, 1+ = regular chapters in ascending order'
+    :'1, 2, 3... in ascending order';
+  return `{
   "type": "object",
   "properties": {
-    "book_title": { "type": "string", "description": "שם הספר" },
-    "book_description": { "type": "string", "description": "תיאור כללי של הספר" },
+    "book_title":       { "type": "string",  "description": "Book title in Hebrew" },
+    "book_description": { "type": "string",  "description": "1-2 sentence summary in Hebrew" },
     "chapters": {
       "type": "array",
-      "description": "רשימת הפרקים",
       "items": {
         "type": "object",
         "properties": {
-          "chapter_number": { "type": "integer", "description": "מספר הפרק (${state.book.hasIntro ? '0 = מבוא, 1+ = פרקים רגילים' : '1 = פרק ראשון ומעלה'})" },
-          "title": { "type": "string", "description": "כותרת הפרק בעברית" },
-          "description": { "type": "string", "description": "תיאור קצר של תוכן הפרק (2-3 משפטים)" }
+          "chapter_number": { "type": "integer", "description": "${intro}" },
+          "title":          { "type": "string",  "description": "Chapter title in Hebrew" },
+          "description":    { "type": "string",  "description": "2-3 sentence chapter summary in Hebrew" }
         },
-        "required": ["chapter_number", "title", "description"]
+        "required": ["chapter_number","title","description"]
       }
     }
   },
-  "required": ["book_title", "book_description", "chapters"]
+  "required": ["book_title","book_description","chapters"]
 }`;
 }
 
-function getChapterSchema() {
-    // Build content oneOf array based on skills
-    const contentTypes = [
-        `{
-          "type": "object",
+function chapterSchema(chNum){
+  const types=[
+    `{
           "description": "Paragraph of text",
-          "properties": {
-            "type": { "const": "text" },
-            "text": { "type": "string", "description": "Paragraph text in Hebrew" }
-          },
-          "required": ["type", "text"]
+          "properties": { "type":{"const":"text"}, "text":{"type":"string","description":"Paragraph in Hebrew"} },
+          "required": ["type","text"]
         }`,
-        `{
-          "type": "object",
-          "description": "Section heading",
-          "properties": {
-            "type": { "const": "heading" },
-            "text": { "type": "string", "description": "Heading text in Hebrew" }
-          },
-          "required": ["type", "text"]
+    `{
+          "description": "Section sub-heading",
+          "properties": { "type":{"const":"heading"}, "text":{"type":"string","description":"Heading in Hebrew"} },
+          "required": ["type","text"]
         }`
-    ];
-    
-    if (state.book.skills.includes('chess')) {
-        contentTypes.push(`{
-          "type": "object",
-          "description": "Chess position diagram",
+  ];
+  if(S.book.skills.includes('chess'))
+    types.push(`{
+          "description": "Chess position diagram — include wherever it helps illustrate a concept",
           "properties": {
-            "type": { "const": "chess" },
-            "fen": { "type": "string", "description": "FEN notation of the chess position" },
-            "caption": { "type": "string", "description": "Caption/description of the position in Hebrew" }
+            "type":    {"const":"chess"},
+            "fen":     {"type":"string","description":"Valid FEN string, e.g. rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"},
+            "caption": {"type":"string","description":"Caption describing the position in Hebrew"}
           },
-          "required": ["type", "fen", "caption"]
+          "required": ["type","fen","caption"]
         }`);
-    }
-    
-    if (state.book.skills.includes('music')) {
-        contentTypes.push(`{
-          "type": "object",
-          "description": "Music notation",
+  if(S.book.skills.includes('music'))
+    types.push(`{
+          "description": "Music notation — include wherever it helps illustrate a concept. Use \\\\n for newlines inside the JSON string.",
           "properties": {
-            "type": { "const": "music" },
-            "abc": { "type": "string", "description": "ABC notation of the musical passage (standard ABC format)" },
-            "caption": { "type": "string", "description": "Caption/description in Hebrew" }
+            "type":    {"const":"music"},
+            "abc":     {"type":"string","description":"Standard ABC notation. Example: X:1\\\\nT:Scale\\\\nM:4/4\\\\nL:1/4\\\\nK:C\\\\n|CDEF|GABc|"},
+            "caption": {"type":"string","description":"Caption in Hebrew"}
           },
-          "required": ["type", "abc", "caption"]
+          "required": ["type","abc","caption"]
         }`);
-    }
-    
-    if (state.book.skills.includes('code')) {
-        contentTypes.push(`{
-          "type": "object",
-          "description": "Code example",
+  if(S.book.skills.includes('code'))
+    types.push(`{
+          "description": "Code example — include wherever relevant. Use \\\\n for newlines inside the JSON string.",
           "properties": {
-            "type": { "const": "code" },
-            "language": { "type": "string", "description": "Programming language (e.g., python, javascript, java, c)" },
-            "code": { "type": "string", "description": "The code snippet" },
-            "caption": { "type": "string", "description": "Caption/description in Hebrew" }
+            "type":     {"const":"code"},
+            "language": {"type":"string","description":"e.g. python, javascript, java, c, cpp, bash"},
+            "code":     {"type":"string","description":"Code content"},
+            "caption":  {"type":"string","description":"Caption in Hebrew"}
           },
-          "required": ["type", "language", "code"]
+          "required": ["type","language","code"]
         }`);
-    }
-    
-    return `{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "BookChapter",
+
+  return `{
   "type": "object",
   "properties": {
     "validation": {
       "type": "object",
-      "description": "Prevents duplicate chapter submission",
+      "description": "Anti-duplicate guard — MUST match the chapter being written",
       "properties": {
-        "chapter_number": { "type": "integer" },
-        "book_title": { "type": "string" }
+        "chapter_number": { "type": "integer", "const": ${chNum} },
+        "book_title":     { "type": "string"  }
       },
-      "required": ["chapter_number", "book_title"]
+      "required": ["chapter_number","book_title"]
     },
-    "chapter_number": { "type": "integer" },
-    "title": { "type": "string", "description": "Chapter title in Hebrew" },
+    "chapter_number": { "type": "integer", "const": ${chNum} },
+    "title":          { "type": "string",  "description": "Chapter title in Hebrew" },
     "content": {
       "type": "array",
-      "description": "Array of content blocks",
+      "description": "Array of content blocks — write the full chapter here. Aim for rich, detailed content.",
       "items": {
         "oneOf": [
-${contentTypes.join(',\n')}
+${types.join(',\n')}
         ]
       }
     }
   },
-  "required": ["validation", "chapter_number", "title", "content"]
+  "required": ["validation","chapter_number","title","content"]
 }`;
 }
 
-// ====================================================
+// ─────────────────────────────────────────────
 // PROMPT BUILDERS
-// ====================================================
-function buildTOCPrompt() {
-    const b = state.book;
-    const introText = b.hasIntro ? `, plus an introduction chapter (chapter 0)` : '';
-    const extraText = b.extra ? `\n${b.extra}` : '';
-    
-    return `You are a professional book writer. You are now talking to an API, so be sure to write exactly as I have instructed.
-Write me book details and a table of contents for a book on "${b.title}". ${b.desc}, the book will have ${b.chapterCount} chapters${introText}.${extraText}
-Write it in Hebrew, in JSON format, following the following schema.
-${getTOCSchema()}
+// ─────────────────────────────────────────────
+function buildTOCPrompt(){
+  const b=S.book;
+  const intro=b.intro?', plus an introduction chapter (chapter number 0)':'';
+  const extra=b.extra?'\n'+b.extra:'';
+  return `You are a professional book writer. You are now talking to an API, so be sure to write exactly as I have instructed.
+Write me book details and a table of contents for a book on "${b.title}". ${b.desc}, the book will have ${b.chapters} chapters${intro}.${extra}
+Write it in Hebrew, in JSON format only, following the schema below. Output nothing except the JSON object.
+
+${tocSchema()}
+
 Then if you are using canvas mode in GEMINI or GPT or similar, send the user in the main channel the following message, otherwise do not send them anything other than the JSON file:
 תודה שהחלטת להשתמש ב-BookGenius. הכנתי עבורך את תוכן העניינים, הדבק אותו בכלי, ובצע את ההוראות שם.`;
 }
 
-function buildChapterPrompt(chapter) {
-    const b = state.book;
-    const tocJSON = JSON.stringify(state.toc, null, 2);
-    
-    let skillsInfo = '';
-    if (b.skills.includes('chess')) {
-        skillsInfo += `\nChess diagrams: When you need to show a chess position, use a content block of type "chess" with a valid FEN string and a Hebrew caption. Include diagrams where relevant to explain concepts.`;
-    }
-    if (b.skills.includes('music')) {
-        skillsInfo += `\nMusic notation: When you need to show musical notation, use a content block of type "music" with valid ABC notation (standard format) and a Hebrew caption. Include notation where relevant.`;
-    }
-    if (b.skills.includes('code')) {
-        skillsInfo += `\nCode examples: When you need to show code, use a content block of type "code" with the programming language, the code, and a Hebrew caption. Include code examples where relevant.`;
-    }
-    
-    return `You are a professional book writer. You are now talking to an API, so be sure to write exactly as I have instructed you.
-Write me chapter number ${chapter.chapter_number} - "${chapter.title}" from the book "${b.title}". ${b.desc}${b.extra ? ', ' + b.extra : ''}.
-Write it in Hebrew, in JSON format, following the following schema.
-${getChapterSchema()}
-For context, here are the details of all the chapters in the book:
-${tocJSON}
-${skillsInfo ? 'Skills information:' + skillsInfo : ''}
+function buildChapterPrompt(ch){
+  const b=S.book;
+  const tocStr=JSON.stringify(S.toc,null,2);
+  let skills='';
+  if(b.skills.includes('chess'))
+    skills+='\n- Chess: whenever a position or concept benefits from a diagram, include a "chess" content block with a valid FEN string.';
+  if(b.skills.includes('music'))
+    skills+='\n- Music notation: whenever a musical passage or concept benefits from notation, include a "music" content block with valid ABC notation.';
+  if(b.skills.includes('code'))
+    skills+='\n- Code: whenever a concept benefits from a code example, include a "code" content block with the language and code.';
+
+  return `You are a professional book writer. You are now talking to an API, so be sure to write exactly as I have instructed you.
+Write me chapter number ${ch.chapter_number} — "${ch.title}" from the book "${b.title}". ${b.desc}${b.extra?', '+b.extra:''}.
+Write it in Hebrew, in JSON format only, following the schema below. Output nothing except the JSON object.
+
+${chapterSchema(ch.chapter_number)}
+
+For context, here are all the chapters in the book:
+${tocStr}
+${skills?'\nSkills — use these content block types where appropriate:'+skills:''}
+
 Then if you are using canvas mode in GEMINI or GPT or similar, send the user in the main channel the following message, otherwise do not send them anything other than the JSON file:
 כתבתי את הפרק, העתק את הפרק לכלי ועקוב אחר ההוראות שם. אל תדאג על העיצוב, BookGenius כבר יטפל בזה.`;
 }
 
-// ====================================================
-// STEP 3: Process TOC
-// ====================================================
-function processTOC() {
-    const input = document.getElementById('tocInput').value;
-    const errorEl = document.getElementById('tocError');
-    const errorMsg = document.getElementById('tocErrorMsg');
-    
-    try {
-        let jsonStr = input;
-        const match = input.match(/\{[\s\S]*\}/);
-        if (match) jsonStr = match[0];
-        
-        const data = JSON.parse(jsonStr);
-        
-        if (!data.chapters || !Array.isArray(data.chapters) || data.chapters.length === 0) {
-            throw new Error('המבנה אינו תקין: חסר מערך chapters');
-        }
-        
-        state.toc = data;
-        state.book.title = data.book_title || state.book.title;
-        
-        // Sort chapters by chapter_number
-        state.toc.chapters.sort((a, b) => a.chapter_number - b.chapter_number);
-        
-        // Initialize chapters tracking
-        state.chapters = {};
-        
-        // Set first chapter
-        state.currentChNum = state.toc.chapters[0].chapter_number;
-        
-        errorEl.classList.add('hidden');
-        
-        goStep(4);
-        setupChapterDashboard();
-        
-    } catch(e) {
-        console.error(e);
-        errorEl.classList.remove('hidden');
-        errorMsg.textContent = ` שגיאה: ${e.message}. וודא שהדבקת JSON תקין.`;
+// ─────────────────────────────────────────────
+// STEP 1
+// ─────────────────────────────────────────────
+function step1Submit(){
+  syncForm();
+  if(!S.book.title||!S.book.desc){alert('אנא מלא לפחות נושא ופרטי הספר');return;}
+  const p=buildTOCPrompt();
+  $('tocPrompt').value=p;
+  goStep(2);
+  setTimeout(()=>copyText('tocPrompt','badge2'),400);
+}
+
+// ─────────────────────────────────────────────
+// STEP 3 — Process TOC
+// ─────────────────────────────────────────────
+function processTOC(){
+  hideErr('tocErr');
+  try{
+    const raw=$('tocInput').value;
+    if(!raw.trim()) throw new Error('אנא הדבק את תגובת ה-LLM');
+    const jsonStr=extractJSON(raw);
+    const data=JSON.parse(jsonStr);
+    if(!data.chapters||!Array.isArray(data.chapters)||!data.chapters.length)
+      throw new Error('המבנה חסר את מערך chapters');
+    data.chapters.sort((a,b)=>a.chapter_number-b.chapter_number);
+    S.toc=data;
+    S.book.title=data.book_title||S.book.title;
+    S.done={};
+    S.curCh=data.chapters[0].chapter_number;
+    goStep(4);
+    setupDashboard();
+  }catch(e){showErr('tocErr','tocErrMsg',e.message);}
+}
+
+// ─────────────────────────────────────────────
+// STEP 4 — Dashboard
+// ─────────────────────────────────────────────
+function setupDashboard(){
+  renderSidebar();
+  const ch=S.toc.chapters.find(c=>c.chapter_number===S.curCh)||S.toc.chapters[0];
+  loadChapter(ch.chapter_number);
+}
+
+function renderSidebar(){
+  const total=S.toc.chapters.length;
+  const doneCount=Object.keys(S.done).length;
+  $('chProgText').textContent=`${doneCount} / ${total} הושלמו`;
+  $('chFooter').style.display=doneCount===total?'block':'none';
+
+  const list=$('chapterList');
+  list.innerHTML='';
+  S.toc.chapters.forEach(ch=>{
+    const isDone=S.done[ch.chapter_number]!==undefined;
+    const isCur=ch.chapter_number===S.curCh;
+    const div=document.createElement('div');
+    div.className='ch-item'+(isDone?' ch-done':'')+(isCur?' active':'');
+    const numLbl=ch.chapter_number===0?'מבוא':'פרק '+ch.chapter_number;
+    const icon=isDone?'✅':isCur?'✏️':'⏳';
+    div.innerHTML=`<span class="ch-icon">${icon}</span><div><div class="ch-num">${numLbl}</div><div class="ch-name">${ch.title}</div></div>`;
+    if(!isDone) div.onclick=()=>loadChapter(ch.chapter_number);
+    list.appendChild(div);
+  });
+}
+
+function loadChapter(chNum){
+  S.curCh=chNum;
+  const ch=S.toc.chapters.find(c=>c.chapter_number===chNum);
+  if(!ch)return;
+  const numLbl=chNum===0?'מבוא':'פרק '+chNum;
+  $('chNumBadge').textContent=numLbl;
+  $('chTitle').textContent=ch.title;
+  $('chDesc').textContent=ch.description;
+  $('chapterPrompt').value=buildChapterPrompt(ch);
+  $('chapterInput').value='';
+  hideErr('chErr');
+  setChTab('prompt');
+  renderSidebar();
+  save();
+}
+
+function setChTab(tab){
+  const isP=tab==='prompt';
+  $('chPanelPrompt').style.display=isP?'flex':'none';
+  $('chPanelPaste').style.display=isP?'none':'flex';
+  $('tabPrompt').classList.toggle('active',isP);
+  $('tabPaste').classList.toggle('active',!isP);
+  if(isP) setTimeout(()=>copyText('chapterPrompt','badge4'),250);
+}
+
+// ─────────────────────────────────────────────
+// STEP 4 — Process Chapter
+// ─────────────────────────────────────────────
+function processChapter(){
+  hideErr('chErr');
+  try{
+    const raw=$('chapterInput').value;
+    if(!raw.trim()) throw new Error('אנא הדבק את תגובת ה-LLM');
+    const jsonStr=extractJSON(raw);
+    const data=JSON.parse(jsonStr);
+
+    // Validate structure
+    if(!data.validation) throw new Error('חסר אובייקט validation');
+    if(!data.content||!Array.isArray(data.content)) throw new Error('חסר מערך content');
+
+    // Validate chapter number
+    const gotNum=parseInt(data.validation.chapter_number);
+    if(isNaN(gotNum)) throw new Error('validation.chapter_number חסר או לא מספרי');
+    if(gotNum!==S.curCh) throw new Error(`מספר פרק שגוי: קיבלנו ${gotNum}, ציפינו ${S.curCh}. וודא שהדבקת את הפרק הנכון`);
+
+    // Duplicate warning
+    if(S.done[S.curCh]!==undefined){
+      if(!confirm(`פרק ${S.curCh} כבר קיים. האם לדרוס?`))return;
     }
+
+    S.done[S.curCh]=data;
+    renderSidebar();
+
+    // Find next undone chapter
+    const all=S.toc.chapters.slice().sort((a,b)=>a.chapter_number-b.chapter_number);
+    const allDone=all.every(c=>S.done[c.chapter_number]!==undefined);
+    if(allDone){finishBook();return;}
+
+    // Next undone after current
+    const curIdx=all.findIndex(c=>c.chapter_number===S.curCh);
+    let next=all.slice(curIdx+1).find(c=>!S.done[c.chapter_number])
+            ||all.find(c=>!S.done[c.chapter_number]);
+    if(next) loadChapter(next.chapter_number);
+
+    save();
+  }catch(e){showErr('chErr','chErrMsg',e.message);}
 }
 
-// ====================================================
-// STEP 4: Chapter Dashboard
-// ====================================================
-function setupChapterDashboard() {
-    renderChapterList();
-    loadChapter(state.currentChNum);
+function finishBook(){
+  $('bkSubtitle').textContent=`${S.toc.chapters.length} פרקים נכתבו בהצלחה — "${S.book.title}"`;
+  renderBook($('bookPreview'));
+  goStep(5);
 }
 
-function renderChapterList() {
-    const list = document.getElementById('chapterList');
-    const total = state.toc.chapters.length;
-    const done = Object.keys(state.chapters).length;
-    
-    document.getElementById('chaptersProgressText').textContent = `${done}/${total} הושלמו`;
-    
-    list.innerHTML = '';
-    state.toc.chapters.forEach(ch => {
-        const isDone = state.chapters[ch.chapter_number] !== undefined;
-        const isCurrent = ch.chapter_number === state.currentChNum;
-        
-        const div = document.createElement('div');
-        div.className = `chapter-item p-2.5 rounded-lg border text-sm ${
-            isDone ? 'done border-green-200' : 
-            isCurrent ? 'active border-indigo-300' : 
-            'border-gray-200'
-        }`;
-        
-        const icon = isDone ? '✅' : isCurrent ? '✏️' : '⏳';
-        const numLabel = ch.chapter_number === 0 ? 'מבוא' : `פרק ${ch.chapter_number}`;
-        
-        div.innerHTML = `
-            <div class="flex items-start gap-2">
-                <span class="text-base">${icon}</span>
-                <div>
-                    <p class="font-semibold text-gray-700 text-xs">${numLabel}</p>
-                    <p class="text-gray-500 text-xs leading-tight mt-0.5">${ch.title}</p>
-                </div>
-            </div>`;
-        
-        if (!isDone) {
-            div.onclick = () => loadChapter(ch.chapter_number);
-        }
-        
-        list.appendChild(div);
-    });
-}
-
-function loadChapter(chNum) {
-    state.currentChNum = chNum;
-    const chapter = state.toc.chapters.find(c => c.chapter_number === chNum);
-    if (!chapter) return;
-    
-    const numLabel = chNum === 0 ? 'מבוא' : `פרק ${chNum}`;
-    document.getElementById('chNumBadge').textContent = numLabel;
-    document.getElementById('chTitle').textContent = chapter.title;
-    document.getElementById('chDesc').textContent = chapter.description;
-    
-    // Generate prompt
-    const prompt = buildChapterPrompt(chapter);
-    document.getElementById('chapterPrompt').value = prompt;
-    document.getElementById('chapterInput').value = '';
-    
-    // Hide error
-    document.getElementById('chError').classList.add('hidden');
-    
-    // Set tab to prompt
-    setChTab('prompt');
-    
-    // Auto-copy
-    setTimeout(() => copyText('chapterPrompt', 'badge5'), 300);
-    
-    renderChapterList();
-    saveState();
-}
-
-function setChTab(tab) {
-    state.chTab = tab;
-    const promptPanel = document.getElementById('chPanelPrompt');
-    const pastePanel = document.getElementById('chPanelPaste');
-    const tabPrompt = document.getElementById('tabPrompt');
-    const tabPaste = document.getElementById('tabPaste');
-    
-    if (tab === 'prompt') {
-        promptPanel.classList.remove('hidden');
-        pastePanel.classList.add('hidden');
-        tabPrompt.classList.add('border-indigo-600', 'text-indigo-600');
-        tabPrompt.classList.remove('border-transparent', 'text-gray-400');
-        tabPaste.classList.remove('border-indigo-600', 'text-indigo-600');
-        tabPaste.classList.add('border-transparent', 'text-gray-400');
-    } else {
-        promptPanel.classList.add('hidden');
-        pastePanel.classList.remove('hidden');
-        tabPaste.classList.add('border-indigo-600', 'text-indigo-600');
-        tabPaste.classList.remove('border-transparent', 'text-gray-400');
-        tabPrompt.classList.remove('border-indigo-600', 'text-indigo-600');
-        tabPrompt.classList.add('border-transparent', 'text-gray-400');
-    }
-}
-
-// ====================================================
-// STEP 4: Process Chapter
-// ====================================================
-function processChapter() {
-    const input = document.getElementById('chapterInput').value;
-    const errorEl = document.getElementById('chError');
-    const errorMsg = document.getElementById('chErrorMsg');
-    
-    try {
-        let jsonStr = input;
-        const match = input.match(/\{[\s\S]*\}/);
-        if (match) jsonStr = match[0];
-        
-        const data = JSON.parse(jsonStr);
-        
-        // Validation checks
-        if (!data.validation) {
-            throw new Error('חסר אובייקט validation');
-        }
-        if (data.validation.chapter_number !== state.currentChNum) {
-            throw new Error(`מספר הפרק אינו תואם: ציפינו ל-${state.currentChNum}, קיבלנו ${data.validation.chapter_number}`);
-        }
-        if (!data.content || !Array.isArray(data.content)) {
-            throw new Error('חסר מערך content');
-        }
-        
-        // Check for duplicate
-        if (state.chapters[state.currentChNum] !== undefined) {
-            if (!confirm(`פרק ${state.currentChNum} כבר קיים. האם לדרוס?`)) {
-                return;
-            }
-        }
-        
-        // Store chapter
-        state.chapters[data.validation.chapter_number] = data;
-        errorEl.classList.add('hidden');
-        
-        // Find next chapter
-        const sortedChapters = state.toc.chapters.sort((a, b) => a.chapter_number - b.chapter_number);
-        const currentIdx = sortedChapters.findIndex(c => c.chapter_number === state.currentChNum);
-        
-        // Check if all done
-        const allDone = sortedChapters.every(c => state.chapters[c.chapter_number] !== undefined);
-        
-        if (allDone) {
-            // Go to final step
-            buildAndShowBook();
-            goStep(5);
-        } else {
-            // Find next undone chapter
-            let nextChapter = null;
-            for (let i = currentIdx + 1; i < sortedChapters.length; i++) {
-                if (!state.chapters[sortedChapters[i].chapter_number]) {
-                    nextChapter = sortedChapters[i];
-                    break;
-                }
-            }
-            // If not found after current, look from beginning
-            if (!nextChapter) {
-                for (let i = 0; i < sortedChapters.length; i++) {
-                    if (!state.chapters[sortedChapters[i].chapter_number]) {
-                        nextChapter = sortedChapters[i];
-                        break;
-                    }
-                }
-            }
-            
-            if (nextChapter) {
-                loadChapter(nextChapter.chapter_number);
-            }
-        }
-        
-        saveState();
-        
-    } catch(e) {
-        console.error(e);
-        errorEl.classList.remove('hidden');
-        errorMsg.textContent = ` ${e.message}`;
-    }
-}
-
-// ====================================================
+// ─────────────────────────────────────────────
 // RENDERERS
-// ====================================================
+// ─────────────────────────────────────────────
 
-// Chess board renderer
-function renderChessBoard(fen) {
-    const pieceChars = {
-        'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',
-        'k': '♚', 'q': '♛', 'r': '♜', 'b': '♝', 'n': '♞', 'p': '♟'
-    };
-    
-    const position = fen.split(' ')[0];
-    const rows = position.split('/');
-    const board = rows.map(row => {
-        const cells = [];
-        for (const ch of row) {
-            if (!isNaN(ch)) {
-                for (let i = 0; i < parseInt(ch); i++) cells.push(null);
-            } else {
-                cells.push(ch);
-            }
-        }
-        return cells;
-    });
-    
-    const SQ = 48;
-    const SIZE = SQ * 8;
-    
-    let svgContent = '';
-    
-    for (let r = 0; r < 8; r++) {
-        for (let c = 0; c < 8; c++) {
-            const light = (r + c) % 2 === 0;
-            const fill = light ? '#f0d9b5' : '#b58863';
-            svgContent += `<rect x="${c*SQ}" y="${r*SQ}" width="${SQ}" height="${SQ}" fill="${fill}"/>`;
-            
-            const piece = board[r] && board[r][c];
-            if (piece) {
-                const unicode = pieceChars[piece];
-                const isWhite = piece === piece.toUpperCase();
-                svgContent += `<text 
-                    x="${c*SQ + SQ/2}" 
-                    y="${r*SQ + SQ*0.78}" 
-                    text-anchor="middle" 
-                    font-size="${SQ * 0.77}" 
-                    fill="${isWhite ? '#fff' : '#000'}"
-                    stroke="${isWhite ? '#444' : '#ccc'}"
-                    stroke-width="0.5"
-                    paint-order="stroke fill"
-                    font-family="serif">${unicode}</text>`;
-            }
-        }
+/* Chess SVG from FEN */
+function chessFromFEN(fen){
+  const P={'K':'♔','Q':'♕','R':'♖','B':'♗','N':'♘','P':'♙','k':'♚','q':'♛','r':'♜','b':'♝','n':'♞','p':'♟'};
+  const pos=fen.split(' ')[0];
+  const board=pos.split('/').map(row=>{
+    const cells=[];
+    for(const c of row){
+      if(!isNaN(c)) for(let i=0;i<+c;i++) cells.push(null);
+      else cells.push(c);
     }
-    
-    // Rank labels (1-8)
-    const ranks = ['8','7','6','5','4','3','2','1'];
-    const files = ['a','b','c','d','e','f','g','h'];
-    for (let i = 0; i < 8; i++) {
-        const labelColor = (i % 2 === 0) ? '#b58863' : '#f0d9b5';
-        svgContent += `<text x="2" y="${i*SQ + 12}" font-size="11" fill="${labelColor}" font-weight="bold" font-family="sans-serif">${ranks[i]}</text>`;
-        svgContent += `<text x="${i*SQ + SQ - 10}" y="${SIZE - 2}" font-size="11" fill="${(i % 2 === 0) ? '#b58863' : '#f0d9b5'}" font-weight="bold" font-family="sans-serif">${files[i]}</text>`;
+    return cells;
+  });
+  const SQ=48, SIZE=SQ*8;
+  let svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}">`;
+  // Squares
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const light=(r+c)%2===0;
+    svg+=`<rect x="${c*SQ}" y="${r*SQ}" width="${SQ}" height="${SQ}" fill="${light?'#f0d9b5':'#b58863'}"/>`;
+    const pc=board[r]&&board[r][c];
+    if(pc){
+      const isW=pc===pc.toUpperCase();
+      svg+=`<text x="${c*SQ+SQ/2}" y="${r*SQ+SQ*.79}" text-anchor="middle"
+        font-size="${SQ*.78}" font-family="serif"
+        fill="${isW?'#fffde7':'#1a1a1a'}"
+        stroke="${isW?'#555':'#ddd'}" stroke-width=".6"
+        paint-order="stroke fill">${P[pc]||''}</text>`;
     }
-    
-    // Border
-    svgContent += `<rect x="0" y="0" width="${SIZE}" height="${SIZE}" fill="none" stroke="#8b6914" stroke-width="2"/>`;
-    
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}" style="display:block;">${svgContent}</svg>`;
+  }
+  // Coordinates
+  const files=['a','b','c','d','e','f','g','h'];
+  const ranks=['8','7','6','5','4','3','2','1'];
+  for(let i=0;i<8;i++){
+    const lc=(i%2===0)?'#b58863':'#f0d9b5';
+    svg+=`<text x="2" y="${i*SQ+13}" font-size="11" fill="${lc}" font-weight="bold" font-family="sans-serif">${ranks[i]}</text>`;
+    svg+=`<text x="${i*SQ+SQ-10}" y="${SIZE-2}" font-size="11" fill="${((i%2===0))?'#b58863':'#f0d9b5'}" font-weight="bold" font-family="sans-serif">${files[i]}</text>`;
+  }
+  svg+=`<rect x="0" y="0" width="${SIZE}" height="${SIZE}" fill="none" stroke="#7a5c10" stroke-width="1.5"/>`;
+  svg+='</svg>';
+  return svg;
 }
 
-// Render a single content block
-function renderContentBlock(block, chapterNum) {
-    switch(block.type) {
-        case 'text':
-            return `<p class="text-gray-800 leading-relaxed mb-4 text-justify">${block.text.replace(/\n/g, '<br>')}</p>`;
-        
-        case 'heading':
-            return `<h3 class="text-lg font-bold text-indigo-800 mt-6 mb-3">${block.text}</h3>`;
-        
-        case 'chess': {
-            const svgStr = renderChessBoard(block.fen);
-            return `<div class="my-6 flex flex-col items-center">
-                <div class="chess-board-container">${svgStr}</div>
-                ${block.caption ? `<p class="text-sm text-gray-600 mt-2 italic text-center">${block.caption}</p>` : ''}
-            </div>`;
-        }
-        
-        case 'music': {
-            const containerId = `music_${chapterNum}_${Math.random().toString(36).substr(2,6)}`;
-            return `<div class="my-6">
-                <div id="${containerId}" class="abcjs-container" data-abc="${encodeURIComponent(block.abc)}"></div>
-                ${block.caption ? `<p class="text-sm text-gray-600 mt-2 italic text-center">${block.caption}</p>` : ''}
-            </div>`;
-        }
-        
-        case 'code': {
-            const lang = block.language || 'text';
-            const escaped = block.code
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
-            return `<div class="my-5">
-                <div class="bg-gray-900 rounded-xl overflow-hidden">
-                    <div class="flex justify-between items-center px-4 py-2 bg-gray-800">
-                        <span class="text-xs text-gray-400 font-mono">${lang}</span>
-                        ${block.caption ? `<span class="text-xs text-gray-400">${block.caption}</span>` : ''}
-                    </div>
-                    <pre class="p-4 overflow-x-auto"><code class="language-${lang}">${escaped}</code></pre>
-                </div>
-            </div>`;
-        }
-        
-        default:
-            return '';
+/* Render one content block → HTML string */
+function renderBlock(block, chNum){
+  switch((block.type||'').toLowerCase()){
+    case 'text':
+      return `<p>${esc(block.text||'').replace(/\n/g,'<br>')}</p>`;
+    case 'heading':
+      return `<h3>${esc(block.text||'')}</h3>`;
+    case 'chess':{
+      let board='';
+      try{board=chessFromFEN(block.fen);}
+      catch(e){board=`<p style="color:red;font-size:.8rem">שגיאה בפענוח FEN: ${block.fen}</p>`;}
+      return `<div class="chess-wrap">${board}${block.caption?`<div class="chess-caption">${esc(block.caption)}</div>`:''}</div>`;
     }
-}
-
-// Render full book
-function renderBook(containerEl) {
-    const sortedChapters = state.toc.chapters
-        .slice()
-        .sort((a, b) => a.chapter_number - b.chapter_number);
-    
-    let html = `<div class="book-content p-8 space-y-8" dir="rtl">`;
-    
-    // Title page
-    html += `<div class="text-center py-12 border-b border-gray-200">
-        <h1 class="text-4xl font-black text-gray-900 mb-3">${state.book.title}</h1>
-        <p class="text-gray-500 text-lg">${state.toc.book_description || state.book.desc}</p>
-    </div>`;
-    
-    // Table of contents
-    html += `<div class="py-6">
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">תוכן עניינים</h2>
-        <ul class="space-y-2">`;
-    sortedChapters.forEach(ch => {
-        const numLabel = ch.chapter_number === 0 ? 'מבוא' : `פרק ${ch.chapter_number}`;
-        html += `<li class="flex items-center gap-2 text-gray-700">
-            <span class="text-xs text-gray-400 font-semibold">${numLabel}</span>
-            <span class="flex-1 border-b border-dotted border-gray-300"></span>
-            <span>${ch.title}</span>
-        </li>`;
-    });
-    html += `</ul></div>`;
-    
-    // Chapters
-    sortedChapters.forEach(ch => {
-        const chData = state.chapters[ch.chapter_number];
-        if (!chData) return;
-        
-        const numLabel = ch.chapter_number === 0 ? 'מבוא' : `פרק ${ch.chapter_number}`;
-        
-        html += `<div class="book-chapter print-page-break">
-            <div class="border-b-2 border-indigo-200 pb-3 mb-6">
-                <span class="text-sm text-indigo-500 font-semibold">${numLabel}</span>
-                <h2 class="text-2xl font-bold text-gray-900">${chData.title}</h2>
-            </div>`;
-        
-        chData.content.forEach(block => {
-            html += renderContentBlock(block, ch.chapter_number);
-        });
-        
-        html += `</div>`;
-    });
-    
-    html += `</div>`;
-    
-    containerEl.innerHTML = html;
-    
-    // Render music notation
-    containerEl.querySelectorAll('[data-abc]').forEach(el => {
-        const abc = decodeURIComponent(el.dataset.abc);
-        try {
-            ABCJS.renderAbc(el, abc, { 
-                responsive: 'resize',
-                staffwidth: 500
-            });
-        } catch(e) {
-            el.innerHTML = `<p class="text-red-500 text-sm">שגיאה ברינדור תווים: ${e.message}</p>`;
-        }
-    });
-    
-    // Highlight code
-    if (window.Prism) {
-        containerEl.querySelectorAll('pre code').forEach(el => {
-            Prism.highlightElement(el);
-        });
+    case 'music':{
+      const uid='m_'+chNum+'_'+Math.random().toString(36).slice(2,7);
+      const encoded=encodeURIComponent(block.abc||'');
+      return `<div class="music-wrap"><div id="${uid}" data-abc="${encoded}" style="min-height:60px"></div>${block.caption?`<div class="music-caption">${esc(block.caption)}</div>`:''}</div>`;
     }
+    case 'code':{
+      const lang=block.language||'text';
+      const caption=block.caption?`<span>${esc(block.caption)}</span>`:'';
+      return `<div class="code-wrap"><div class="code-header"><span>${esc(lang)}</span>${caption}</div><pre><code class="language-${esc(lang)}">${esc(block.code||'')}</code></pre></div>`;
+    }
+    default: return '';
+  }
 }
 
-function buildAndShowBook() {
-    document.getElementById('bookSubtitle').textContent = `${state.toc.chapters.length} פרקים נכתבו בהצלחה`;
-    const preview = document.getElementById('bookPreview');
-    renderBook(preview);
+/* Render full book into container */
+function renderBook(container){
+  const chs=S.toc.chapters.slice().sort((a,b)=>a.chapter_number-b.chapter_number);
+  let html=`
+  <h1>${esc(S.book.title)}</h1>
+  <p class="bk-subtitle">${esc(S.toc.book_description||S.book.desc)}</p>
+  <hr>
+  <div style="margin-bottom:2rem">
+    <h2 style="margin-bottom:.8rem">תוכן עניינים</h2>`;
+  chs.forEach(ch=>{
+    const lbl=ch.chapter_number===0?'מבוא':'פרק '+ch.chapter_number;
+    html+=`<div class="toc-entry"><span class="toc-num">${esc(lbl)}</span><span class="toc-dots"></span><span>${esc(ch.title)}</span></div>`;
+  });
+  html+='</div>';
+
+  chs.forEach(ch=>{
+    const data=S.done[ch.chapter_number];
+    if(!data)return;
+    const lbl=ch.chapter_number===0?'מבוא':'פרק '+ch.chapter_number;
+    html+=`<div class="bk-chapter">
+      <div class="bk-ch-label">${esc(lbl)}</div>
+      <h2>${esc(data.title||ch.title)}</h2>`;
+    (data.content||[]).forEach(b=>{ html+=renderBlock(b,ch.chapter_number); });
+    html+='</div>';
+  });
+
+  container.innerHTML=html;
+
+  // Render music notation (abcjs)
+  container.querySelectorAll('[data-abc]').forEach(el=>{
+    const abc=decodeURIComponent(el.dataset.abc||'');
+    if(!abc)return;
+    try{
+      if(typeof ABCJS!=='undefined'){
+        ABCJS.renderAbc(el,abc,{responsive:'resize',staffwidth:480,scale:.9,paddingtop:10,paddingbottom:5});
+      } else {
+        el.innerHTML='<p style="color:#888;font-size:.8rem">[abcjs לא נטען — בדוק חיבור לאינטרנט]</p>';
+      }
+    }catch(e){el.innerHTML=`<p style="color:red;font-size:.8rem">שגיאה בתווים: ${e.message}</p>`;}
+  });
+
+  // Highlight code (Prism)
+  if(window.Prism){
+    container.querySelectorAll('pre code').forEach(el=>Prism.highlightElement(el));
+  }
 }
 
-// ====================================================
+// ─────────────────────────────────────────────
 // DOWNLOAD & PRINT
-// ====================================================
-function downloadHTML() {
-    const preview = document.getElementById('bookPreview');
-    
-    const html = `<!DOCTYPE html>
+// ─────────────────────────────────────────────
+function getBookHTML(forPrint){
+  // Clone preview; strip data-abc (SVGs already rendered inside)
+  const clone=$('bookPreview').cloneNode(true);
+  clone.querySelectorAll('[data-abc]').forEach(el=>el.removeAttribute('data-abc'));
+  const body=clone.innerHTML;
+  const printScript=forPrint?'setTimeout(()=>window.print(),800);':'';
+  return `<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <title>${state.book.title}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"><\/script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"><\/script>
-    <script src="https://cdn.jsdelivr.net/npm/abcjs@6.4.0/dist/abcjs-basic-min.js"><\/script>
-    <style>
-        body { font-family: 'Heebo', sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; color: #1a1a1a; }
-        p { line-height: 1.9; margin-bottom: 1rem; text-align: justify; }
-        h2 { font-size: 1.5rem; font-weight: 800; margin: 2rem 0 1rem; color: #1e40af; }
-        h3 { font-size: 1.1rem; font-weight: 700; margin: 1.5rem 0 0.75rem; color: #1e40af; }
-        pre { background: #1e1e2e; padding: 1rem; border-radius: 8px; overflow-x: auto; }
-        code { font-family: 'Courier New', monospace; font-size: 0.875rem; }
-        .chess-board-container { display: inline-block; border: 3px solid #8b6914; border-radius: 4px; overflow: hidden; }
-        .book-chapter { page-break-before: always; }
-        @media print { .book-chapter { page-break-before: always; } }
-    </style>
+<meta charset="UTF-8">
+<title>${esc(S.book.title)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"><\/script>
+<style>
+*{box-sizing:border-box}
+body{font-family:'Heebo',sans-serif;max-width:820px;margin:0 auto;padding:3rem 2rem 5rem;color:#18181e;background:#fff;direction:rtl}
+h1{font-size:2.2rem;font-weight:900;text-align:center;margin-bottom:.4rem;color:#110d33}
+h2{font-size:1.45rem;font-weight:900;color:#2a1660;margin:0 0 .9rem}
+h3{font-size:1.05rem;font-weight:800;color:#3a22a0;margin:1.4rem 0 .5rem}
+p{line-height:1.95;margin-bottom:1rem;text-align:justify}
+hr{border:none;border-top:1px solid #e0e0ef;margin:2rem 0}
+.bk-subtitle{text-align:center;color:#666;margin-bottom:2.5rem;font-size:.95rem}
+.bk-chapter{margin-top:3.5rem;padding-top:2.5rem;border-top:3px solid #ece8ff}
+.bk-ch-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.12em;color:#7c68d0;font-weight:800;margin-bottom:.25rem}
+.toc-entry{display:flex;align-items:baseline;gap:8px;padding:5px 0;font-size:.88rem}
+.toc-num{color:#888;font-size:.76rem;white-space:nowrap}
+.toc-dots{flex:1;border-bottom:1px dotted #ccc}
+.chess-wrap{display:flex;flex-direction:column;align-items:center;margin:1.5rem 0}
+.chess-wrap svg{border:2px solid #8b6914;border-radius:3px}
+.chess-caption{font-size:.8rem;color:#666;margin-top:7px;font-style:italic;text-align:center}
+.music-wrap{direction:ltr;background:#f3f2ff;border-radius:10px;padding:1rem 1.2rem;margin:1.2rem 0}
+.music-caption{font-size:.8rem;color:#666;margin-top:5px;font-style:italic;text-align:center;direction:rtl}
+.code-wrap{margin:1.5rem 0}
+.code-header{background:#21252e;color:#8892a4;font-family:'Fira Code',monospace;font-size:.71rem;padding:7px 14px;border-radius:10px 10px 0 0;display:flex;justify-content:space-between;direction:ltr}
+.code-header+pre{border-radius:0 0 10px 10px!important;margin:0!important}
+pre{border-radius:10px;overflow-x:auto}
+pre code{font-family:'Fira Code',monospace;font-size:.79rem}
+@media print{
+  .bk-chapter{page-break-before:always}
+  pre{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  svg{max-width:100%}
+}
+</style>
 </head>
-<body>
-${preview.innerHTML}
-<script>
-    document.querySelectorAll('[data-abc]').forEach(el => {
-        const abc = decodeURIComponent(el.dataset.abc);
-        ABCJS.renderAbc(el, abc, { responsive: 'resize', staffwidth: 500 });
-    });
-    if (window.Prism) Prism.highlightAll();
-<\/script>
-</body>
+<body>${body}<script>if(window.Prism)Prism.highlightAll();${printScript}<\/script></body>
 </html>`;
-    
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${state.book.title.replace(/[^a-zA-Z0-9\u0590-\u05FF\s]/g, '_')}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
 }
 
-function printBook() {
-    const preview = document.getElementById('bookPreview');
-    
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`<!DOCTYPE html>
-<html lang="he" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <title>${state.book.title}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"><\/script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"><\/script>
-    <script src="https://cdn.jsdelivr.net/npm/abcjs@6.4.0/dist/abcjs-basic-min.js"><\/script>
-    <style>
-        body { font-family: 'Heebo', sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; color: #1a1a1a; }
-        p { line-height: 1.9; margin-bottom: 1rem; text-align: justify; }
-        h2 { font-size: 1.5rem; font-weight: 800; margin: 2rem 0 1rem; color: #1e40af; }
-        h3 { font-size: 1.1rem; font-weight: 700; margin: 1.5rem 0 0.75rem; color: #1e40af; }
-        pre { background: #1e1e2e; padding: 1rem; border-radius: 8px; overflow-x: auto; }
-        code { font-family: 'Courier New', monospace; font-size: 0.875rem; }
-        .chess-board-container { display: inline-block; border: 3px solid #8b6914; border-radius: 4px; overflow: hidden; }
-        .book-chapter { page-break-before: always; }
-        svg { max-width: 100%; }
-        @media print {
-            .book-chapter { page-break-before: always; }
-            pre { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            svg { max-width: 100%; }
-        }
-    </style>
-</head>
-<body>
-${preview.innerHTML}
-<script>
-    document.querySelectorAll('[data-abc]').forEach(el => {
-        const abc = decodeURIComponent(el.dataset.abc);
-        ABCJS.renderAbc(el, abc, { responsive: 'resize', staffwidth: 500 });
-    });
-    if (window.Prism) Prism.highlightAll();
-    setTimeout(() => window.print(), 1500);
-<\/script>
-</body>
-</html>`);
-    printWindow.document.close();
+function downloadHTML(){
+  const html=getBookHTML(false);
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=S.book.title.replace(/[^\u0590-\u05FFa-zA-Z0-9 _-]/g,'_').trim()+'.html';
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
-// ====================================================
-// UTILITIES
-// ====================================================
-function copyText(elementId, badgeId) {
-    const el = document.getElementById(elementId);
-    el.select();
-    el.setSelectionRange(0, 99999);
-    
-    navigator.clipboard.writeText(el.value).then(() => {
-        showBadge(badgeId);
-    }).catch(() => {
-        document.execCommand('copy');
-        showBadge(badgeId);
-    });
+function printBook(){
+  const w=window.open('','_blank');
+  if(!w){alert('אנא אפשר חלונות קופצים עבור אתר זה ונסה שוב');return;}
+  w.document.write(getBookHTML(true));
+  w.document.close();
 }
 
-function showBadge(badgeId) {
-    const badge = document.getElementById(badgeId);
-    if (!badge) return;
-    badge.classList.remove('opacity-0');
-    setTimeout(() => badge.classList.add('opacity-0'), 2000);
-}
-
-// ====================================================
+// ─────────────────────────────────────────────
 // INIT
-// ====================================================
-function init() {
-    const hasSaved = loadState();
-    
-    if (hasSaved && state.step > 1 && state.toc) {
-        // Restore state
-        if (confirm('נמצא ספר שלא הושלם. האם להמשיך מאיפה שהפסקת?')) {
-            // Restore form values
-            document.getElementById('s1_title').value = state.book.title;
-            document.getElementById('s1_desc').value = state.book.desc;
-            document.getElementById('s1_chapters').value = state.book.chapterCount;
-            document.getElementById('s1_extra').value = state.book.extra || '';
-            document.getElementById('s1_intro').checked = state.book.hasIntro || false;
-            
-            // Restore skills
-            state.book.skills.forEach(skill => {
-                document.getElementById(`skill_${skill}`)?.classList.add('selected');
-            });
-            
-            if (state.step === 4 && state.toc) {
-                goStep(4);
-                setupChapterDashboard();
-            } else if (state.step === 5) {
-                goStep(5);
-                buildAndShowBook();
-            } else {
-                goStep(state.step);
-            }
-            return;
-        }
+// ─────────────────────────────────────────────
+(function init(){
+  if(window.Prism&&window.Prism.plugins&&window.Prism.plugins.autoloader)
+    Prism.plugins.autoloader.languages_path='https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
+
+  const hasSaved=load();
+  if(hasSaved&&S.step>1&&S.toc){
+    if(confirm('נמצא ספר שלא הושלם.\nהמשך מאיפה שהפסקת?')){
+      restoreForm();
+      if(S.step===5&&Object.keys(S.done).length===S.toc.chapters.length){
+        // Rebuild book & go to step 5
+        $('bkSubtitle').textContent=`${S.toc.chapters.length} פרקים נכתבו בהצלחה — "${S.book.title}"`;
+        renderBook($('bookPreview'));
+        goStep(5);
+      } else {
+        S.step=4;
+        goStep(4);
+        setupDashboard();
+      }
+      return;
     }
-    
-    goStep(1);
-}
-
-init();
+    localStorage.removeItem(SK);
+    Object.assign(S,{step:1,book:{title:'',desc:'',chapters:10,extra:'',skills:[],intro:false},toc:null,done:{},curCh:0});
+  }
+  goStep(1);
+})();
 </script>
-
 </body>
 </html>
