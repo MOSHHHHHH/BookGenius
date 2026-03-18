@@ -861,7 +861,7 @@ function buildTOCPrompt(){
   const extra=b.extra?'\n'+b.extra:'';
   return `You are a professional book writer. You are now talking to an API, so be sure to write exactly as I have instructed.
 Write me book details and a table of contents for a book on "${b.title}". ${b.desc}, the book will have ${b.chapters} chapters${intro}.${extra}
-Write it in Hebrew, in JSON format only, following the schema below. Output nothing except the JSON object. Unless otherwise requested in the details, write the book in detail, in Hebrew, and in professional but fluent language.
+Write it in Hebrew, in JSON format only, following the schema below. Output nothing except the JSON object. Unless otherwise requested in the details, write the book in great detail, without sparing words, in Hebrew and in professional but fluent language.
 
 ${tocSchema()}
 
@@ -912,7 +912,7 @@ Outputting a code field with literal line breaks will produce invalid JSON and t
 
   return `You are a professional book writer. You are now talking to an API, so be sure to write exactly as I have instructed you.
 Write me ${chDesc} from the book "${b.title}". ${b.desc}${b.extra?', '+b.extra:''}.${chapsToWrite}
-Write it in Hebrew, in JSON format only, following the schema below. Output nothing except the JSON object. Unless otherwise requested in the details, write the book in detail, in Hebrew, and in professional but fluent language.
+Write it in Hebrew, in JSON format only, following the schema below. Output nothing except the JSON object. Unless otherwise requested in the details, write the book in great detail, without sparing words, in Hebrew and in professional but fluent language.
 ${codeWarning}
 ${chapterSchema(chNums)}
 
