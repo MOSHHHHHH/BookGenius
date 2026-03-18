@@ -368,8 +368,24 @@ body{
     <h2 class="sec-title">📥 קליטת תוכן העניינים</h2>
     <p class="sec-sub">הדבק את תגובת ה-LLM. הכלי ייחלץ את ה-JSON אוטומטית גם מתוך טקסט.</p>
   </div>
-  <textarea id="tocInput" class="paste-box" rows="15" placeholder="הדבק את תגובת ה-LLM כאן..." dir="ltr"></textarea>
+  <textarea id="tocInput" class="paste-box" rows="12" placeholder="הדבק את תגובת ה-LLM כאן..." dir="ltr"></textarea>
   <div class="err-msg" id="tocErr"><i class="fas fa-exclamation-circle"></i><span id="tocErrMsg"></span></div>
+
+  <!-- Repair prompt for TOC (shown only after a JSON parse error) -->
+  <div id="tocRepairWrap" style="display:none;flex-direction:column;gap:8px;background:rgba(232,185,35,.06);border:1px solid rgba(232,185,35,.28);border-radius:10px;padding:14px">
+    <p style="font-size:.84rem;color:var(--gold);font-weight:800"><i class="fas fa-wrench"></i> נוצר פרומפט תיקון אוטומטי</p>
+    <p style="font-size:.78rem;color:var(--muted);line-height:1.65">
+      ה-JSON שהתקבל הכיל שגיאת עיצוב. שלח את הפרומפט הבא ל-LLM — הוא יתקן את ה-JSON ויחזיר גרסה תקינה.
+    </p>
+    <div style="position:relative">
+      <textarea id="tocRepairPrompt" class="prompt-box" rows="8" readonly dir="ltr" style="font-size:.72rem"></textarea>
+      <div class="copy-badge" id="badgeTocRepair">✓ הועתק!</div>
+    </div>
+    <button onclick="copyText('tocRepairPrompt','badgeTocRepair')" class="btn btn-dark" style="font-size:.8rem;padding:8px 14px;align-self:flex-start">
+      <i class="fas fa-copy"></i> העתק פרומפט תיקון
+    </button>
+  </div>
+
   <div style="display:flex;justify-content:space-between;align-items:center">
     <button onclick="goStep(2)" class="btn btn-ghost"><i class="fas fa-arrow-right"></i> חזור</button>
     <button onclick="processTOC()" class="btn btn-primary">עבד נתונים ותחיל כתיבה <i class="fas fa-cogs"></i></button>
@@ -419,6 +435,24 @@ body{
     <div id="chPanelPaste" style="display:none;flex-direction:column;gap:12px">
       <textarea id="chapterInput" class="paste-box" rows="12" placeholder="הדבק את תגובת ה-LLM לפרק זה..." dir="ltr"></textarea>
       <div class="err-msg" id="chErr"><i class="fas fa-exclamation-circle"></i><span id="chErrMsg"></span></div>
+
+      <!-- Repair prompt (shown only after a JSON parse error) -->
+      <div id="chRepairWrap" style="display:none;flex-direction:column;gap:8px;background:rgba(232,185,35,.06);border:1px solid rgba(232,185,35,.25);border-radius:10px;padding:14px">
+        <p style="font-size:.82rem;color:var(--gold);font-weight:700">
+          <i class="fas fa-wrench"></i> נוצר פרומפט תיקון אוטומטי
+        </p>
+        <p style="font-size:.78rem;color:var(--muted);line-height:1.6">
+          ה-JSON שהתקבל הכיל שגיאת עיצוב. שלח את הפרומפט הבא ל-LLM — הוא יתקן את ה-JSON בלי לשנות את התוכן.
+        </p>
+        <div style="position:relative">
+          <textarea id="repairPrompt" class="prompt-box" rows="8" readonly dir="ltr" style="font-size:.72rem"></textarea>
+          <div class="copy-badge" id="badgeRepair">✓ הועתק!</div>
+        </div>
+        <button onclick="copyText('repairPrompt','badgeRepair')" class="btn btn-dark" style="font-size:.8rem;padding:8px 14px;align-self:flex-start">
+          <i class="fas fa-copy"></i> העתק פרומפט תיקון
+        </button>
+      </div>
+
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <button onclick="setChTab('prompt')" class="btn btn-ghost" style="font-size:.82rem;padding:9px 14px"><i class="fas fa-arrow-right"></i> חזור לפרומפט</button>
         <button onclick="processChapter()" class="btn btn-primary" style="font-size:.82rem;padding:9px 18px"><i class="fas fa-check"></i> אשר ושמור פרק זה</button>
@@ -482,11 +516,129 @@ function showBadge(id){
 function showErr(elId,msgId,msg){$(elId).classList.add('show');$(msgId).textContent=' '+msg;}
 function hideErr(elId){$(elId).classList.remove('show');}
 
-function extractJSON(raw){
+// ─────────────────────────────────────────────
+// ROBUST JSON REPAIR (multi-pass)
+// ─────────────────────────────────────────────
+
+/* Pass 1 — fix bare control chars inside JSON strings (state machine).
+   Handles: literal \n \r \t and other control characters.
+   Does NOT attempt to fix unescaped double-quotes (ambiguous). */
+function repairControlChars(str){
+  let out='', inStr=false, i=0;
+  while(i<str.length){
+    const ch=str[i];
+    if(inStr && ch==='\\'){           // already-escaped → pass through
+      out+=ch+(str[i+1]||''); i+=2; continue;
+    }
+    if(ch==='"'){ inStr=!inStr; out+=ch; i++; continue; }
+    if(inStr){
+      if(ch==='\n'){ out+='\\n';  i++; continue; }
+      if(ch==='\r'){ out+='\\r';  i++; continue; }
+      if(ch==='\t'){ out+='\\t';  i++; continue; }
+      const cc=ch.charCodeAt(0);
+      if(cc<32){ out+='\\u'+cc.toString(16).padStart(4,'0'); i++; continue; }
+    }
+    out+=ch; i++;
+  }
+  return out;
+}
+
+/* Pass 2 — remove trailing commas before } or ] */
+function fixTrailingCommas(s){ return s.replace(/,(\s*[}\]])/g,'$1'); }
+
+/* Pass 3 — specifically re-escape code/abc field values by finding
+   "code": "…" or "abc": "…" spans and escaping their raw content.
+   Handles the case where LLMs produce literal newlines/quotes inside code. */
+function repairCodeFields(str){
+  // Match: "code" or "abc" or "fen", colon, optional space, then the string value
+  // We rebuild the value with proper escaping.
+  return str.replace(/"(code|abc|fen)"\s*:\s*"([\s\S]*?)(?<!\\)"(\s*[,}\]])/g,
+    (match, key, val, tail)=>{
+      // val is the raw content captured by the lazy [\s\S]*?
+      // Re-escape it properly
+      const safe=val
+        .replace(/\\/g,'\\\\')      // must come first
+        .replace(/"/g,'\\"')
+        .replace(/\n/g,'\\n')
+        .replace(/\r/g,'\\r')
+        .replace(/\t/g,'\\t');
+      return `"${key}":"${safe}"${tail}`;
+    }
+  );
+}
+
+/* Try to parse JSON using increasingly aggressive repair strategies.
+   Returns the parsed object on success.
+   Throws with a clear Hebrew message on failure. */
+function robustParse(raw){
+  // Step 0: strip markdown fences and find outermost { }
   let s=raw.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
   const m=s.match(/\{[\s\S]*\}/);
-  if(m) return m[0];
-  throw new Error('לא נמצא JSON תקין בטקסט');
+  if(!m) throw new Error('לא נמצא JSON בתגובה — ייתכן שה-LLM שלח טקסט בלבד ללא JSON');
+  const base=m[0];
+
+  const strategies=[
+    ()=>base,
+    ()=>repairControlChars(base),
+    ()=>fixTrailingCommas(repairControlChars(base)),
+    ()=>repairCodeFields(repairControlChars(base)),
+    ()=>fixTrailingCommas(repairCodeFields(repairControlChars(base))),
+  ];
+
+  let lastErr;
+  for(const fn of strategies){
+    try{ return JSON.parse(fn()); }catch(e){ lastErr=e; }
+  }
+  // All strategies failed — throw with position info
+  throw lastErr;
+}
+
+// ─────────────────────────────────────────────
+// FIX PROMPT BUILDER
+// ─────────────────────────────────────────────
+function buildFixPrompt(originalPrompt, rawResponse, errorMsg){
+  const preview=rawResponse.length>3000
+    ? rawResponse.slice(0,3000)+'\n... [truncated]'
+    : rawResponse;
+  return `Your previous JSON response could not be parsed due to the following error:
+
+ERROR: ${errorMsg}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IMPORTANT — HOW TO FIX JSON STRINGS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+JSON strings MUST NOT contain literal (raw) control characters.
+You must ESCAPE them:
+
+  Newline     →  \\n       (backslash + letter n)
+  Tab         →  \\t       (backslash + letter t)
+  Backslash   →  \\\\      (two backslashes)
+  Double-quote →  \\"      (backslash + quote)
+  Carriage-ret →  \\r
+
+This is especially critical for "code", "abc", and any field containing
+multi-line text. Every string value must be a single line in the JSON.
+
+CORRECT example:
+  "code": "def hello():\\n    print('hi')\\n    return True"
+
+WRONG example (will crash):
+  "code": "def hello():
+    print('hi')
+    return True"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+YOUR PREVIOUS RESPONSE (which had the error):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${preview}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Please return ONLY a corrected, valid JSON object — no markdown fences,
+no explanations, nothing before or after the JSON.
+
+Original request (repeat response to this):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${originalPrompt}`;
 }
 
 // ─────────────────────────────────────────────
@@ -611,11 +763,11 @@ function chapterSchema(chNum){
         }`);
   if(S.book.skills.includes('code'))
     types.push(`{
-          "description": "Code example — include wherever relevant. Use \\\\n for newlines inside the JSON string.",
+          "description": "Code example. CRITICAL JSON RULES FOR THE code FIELD: (1) Use \\\\n for every line break — NEVER a literal newline. (2) Use \\\\\\\\ for every backslash. (3) Use \\\\\\" for every quote inside the code. Violation of these rules will break the JSON. Correct example: \\"def f():\\\\n    return 1\\"",
           "properties": {
             "type":     {"const":"code"},
             "language": {"type":"string","description":"e.g. python, javascript, java, c, cpp, bash"},
-            "code":     {"type":"string","description":"Code content"},
+            "code":     {"type":"string","description":"Code as a single-line JSON string — use \\\\n for newlines, \\\\\\\\ for backslashes, \\\\\\" for quotes. NO literal line breaks allowed."},
             "caption":  {"type":"string","description":"Caption in Hebrew"}
           },
           "required": ["type","language","code"]
@@ -677,10 +829,22 @@ function buildChapterPrompt(ch){
   if(b.skills.includes('code'))
     skills+='\n- Code: whenever a concept benefits from a code example, include a "code" content block with the language and code.';
 
+  const codeWarning=S.book.skills.includes('code')?`
+⚠️  CRITICAL — JSON STRING ESCAPING FOR CODE BLOCKS:
+Every "code" field value must be a valid single-line JSON string:
+  • Line breaks  → \\n   (backslash + n, NOT a literal newline)
+  • Backslashes  → \\\\  (two backslashes)
+  • Double quotes → \\"  (backslash + quote)
+  • Tabs         → \\t
+Example of a CORRECT code field:
+  "code": "def greet(name):\\n    print(f'Hello, {name}!')\\n    return True"
+Outputting a code field with literal line breaks will produce invalid JSON and the chapter will be rejected.
+`:'';
+
   return `You are a professional book writer. You are now talking to an API, so be sure to write exactly as I have instructed you.
 Write me chapter number ${ch.chapter_number} — "${ch.title}" from the book "${b.title}". ${b.desc}${b.extra?', '+b.extra:''}.
 Write it in Hebrew, in JSON format only, following the schema below. Output nothing except the JSON object.
-
+${codeWarning}
 ${chapterSchema(ch.chapter_number)}
 
 For context, here are all the chapters in the book:
@@ -708,11 +872,11 @@ function step1Submit(){
 // ─────────────────────────────────────────────
 function processTOC(){
   hideErr('tocErr');
+  $('tocRepairWrap').style.display='none';
+  const raw=$('tocInput').value.trim();
   try{
-    const raw=$('tocInput').value;
-    if(!raw.trim()) throw new Error('אנא הדבק את תגובת ה-LLM');
-    const jsonStr=extractJSON(raw);
-    const data=JSON.parse(jsonStr);
+    if(!raw) throw new Error('אנא הדבק את תגובת ה-LLM');
+    const data=robustParse(raw);
     if(!data.chapters||!Array.isArray(data.chapters)||!data.chapters.length)
       throw new Error('המבנה חסר את מערך chapters');
     data.chapters.sort((a,b)=>a.chapter_number-b.chapter_number);
@@ -722,7 +886,17 @@ function processTOC(){
     S.curCh=data.chapters[0].chapter_number;
     goStep(4);
     setupDashboard();
-  }catch(e){showErr('tocErr','tocErrMsg',e.message);}
+  }catch(e){
+    // Show inline error
+    showErr('tocErr','tocErrMsg', e.message);
+    // Build and show fix prompt
+    if(raw){
+      const fp=buildFixPrompt(buildTOCPrompt(), raw, e.message);
+      $('tocRepairPrompt').value=fp;
+      $('tocRepairWrap').style.display='flex';
+      setTimeout(()=>copyText('tocRepairPrompt','badgeTocRepair'),200);
+    }
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -766,6 +940,7 @@ function loadChapter(chNum){
   $('chapterPrompt').value=buildChapterPrompt(ch);
   $('chapterInput').value='';
   hideErr('chErr');
+  $('chRepairWrap').style.display='none';
   setChTab('prompt');
   renderSidebar();
   save();
@@ -777,28 +952,48 @@ function setChTab(tab){
   $('chPanelPaste').style.display=isP?'none':'flex';
   $('tabPrompt').classList.toggle('active',isP);
   $('tabPaste').classList.toggle('active',!isP);
-  if(isP) setTimeout(()=>copyText('chapterPrompt','badge4'),250);
+  if(isP){
+    $('chRepairWrap').style.display='none';
+    setTimeout(()=>copyText('chapterPrompt','badge4'),250);
+  }
 }
 
 // ─────────────────────────────────────────────
 // STEP 4 — Process Chapter
 // ─────────────────────────────────────────────
+function showRepairPrompt(raw, errMsg){
+  const ch=S.toc.chapters.find(c=>c.chapter_number===S.curCh);
+  if(!ch) return;
+  const fp=buildFixPrompt(buildChapterPrompt(ch), raw, errMsg);
+  $('repairPrompt').value=fp;
+  $('chRepairWrap').style.display='flex';
+  setTimeout(()=>copyText('repairPrompt','badgeRepair'),200);
+}
+
 function processChapter(){
   hideErr('chErr');
+  $('chRepairWrap').style.display='none';
+  const raw=$('chapterInput').value.trim();
   try{
-    const raw=$('chapterInput').value;
-    if(!raw.trim()) throw new Error('אנא הדבק את תגובת ה-LLM');
-    const jsonStr=extractJSON(raw);
-    const data=JSON.parse(jsonStr);
+    if(!raw) throw new Error('אנא הדבק את תגובת ה-LLM');
+
+    let data;
+    try{
+      data=robustParse(raw);
+    }catch(parseErr){
+      const friendly=`שגיאת JSON: ${parseErr.message} — הכלי ניסה לתקן אוטומטית אך לא הצליח. השתמש בפרומפט התיקון שנוצר למטה.`;
+      showRepairPrompt(raw, parseErr.message);
+      throw new Error(friendly);
+    }
 
     // Validate structure
-    if(!data.validation) throw new Error('חסר אובייקט validation');
+    if(!data.validation) throw new Error('חסר אובייקט validation בתשובה');
     if(!data.content||!Array.isArray(data.content)) throw new Error('חסר מערך content');
 
     // Validate chapter number
     const gotNum=parseInt(data.validation.chapter_number);
     if(isNaN(gotNum)) throw new Error('validation.chapter_number חסר או לא מספרי');
-    if(gotNum!==S.curCh) throw new Error(`מספר פרק שגוי: קיבלנו ${gotNum}, ציפינו ${S.curCh}. וודא שהדבקת את הפרק הנכון`);
+    if(gotNum!==S.curCh) throw new Error(`מספר פרק שגוי: קיבלנו פרק ${gotNum}, ציפינו פרק ${S.curCh} — וודא שהדבקת את הפרק הנכון`);
 
     // Duplicate warning
     if(S.done[S.curCh]!==undefined){
@@ -813,10 +1008,9 @@ function processChapter(){
     const allDone=all.every(c=>S.done[c.chapter_number]!==undefined);
     if(allDone){finishBook();return;}
 
-    // Next undone after current
     const curIdx=all.findIndex(c=>c.chapter_number===S.curCh);
-    let next=all.slice(curIdx+1).find(c=>!S.done[c.chapter_number])
-            ||all.find(c=>!S.done[c.chapter_number]);
+    const next=all.slice(curIdx+1).find(c=>!S.done[c.chapter_number])
+              ||all.find(c=>!S.done[c.chapter_number]);
     if(next) loadChapter(next.chapter_number);
 
     save();
