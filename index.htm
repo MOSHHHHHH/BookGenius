@@ -1015,15 +1015,15 @@ function buildChapterPrompt(chs){
 
   let skills='';
   if(hasSkill('chess'))
-    skills+='\n- Chess: whenever a position or concept benefits from a diagram, include a "chess" content block with a valid FEN string.';
+    skills+='\n- Chess diagrams (optional): you MAY include a "chess" content block with a FEN string if a specific position genuinely adds value. Do not force diagrams where they are not needed.';
   if(hasSkill('music'))
-    skills+='\n- Music notation: whenever a musical passage or concept benefits from notation, include a "music" content block with valid ABC notation.';
+    skills+='\n- Music notation (optional): you MAY include a "music" content block with ABC notation if a specific musical example genuinely adds value. Do not force notation where it is not needed.';
   if(hasSkill('code'))
-    skills+='\n- Code: whenever a concept benefits from a code example, include a "code" content block with the language and code.';
+    skills+='\n- Code examples (optional): you MAY include a "code" content block if a concrete code example genuinely aids understanding. Do not force code where plain explanation suffices.';
   if(hasSkill('tables'))
-    skills+='\n- Tables: whenever data, comparisons, or lists would be clearer as a table, include a "table" content block with headers and rows.';
+    skills+='\n- Tables (optional): you MAY include a "table" content block if presenting data in tabular form is clearly clearer than prose. Do not force tables where text works fine.';
   if(hasSkill('math'))
-    skills+='\n- Math: whenever a formula or equation is needed, include a "math" content block with a LaTeX string (use $$ for display math, $ for inline).';
+    skills+='\n- Math formulas (optional): you MAY include a "math" content block with a LaTeX string if a formula genuinely requires formal notation. Do not force LaTeX for simple expressions.';
 
   const codeWarning=hasSkill('code')?`
 ⚠️  CRITICAL — JSON STRING ESCAPING FOR CODE BLOCKS:
@@ -1057,7 +1057,7 @@ ${codeWarning}${chapterSchema(chNums)}
 
 For context, here are all the chapters in the book:
 ${tocStr}
-${skills?'\nSkills — use these content block types where appropriate:'+skills:''}
+${skills?'\nOptional visual blocks — use only where they genuinely improve understanding:'+skills:''}
 
 Then if you are using canvas mode in GEMINI or GPT or similar, send the user in the main channel the following message, otherwise do not send them anything other than the JSON file:
 ${channelMsg}`;
