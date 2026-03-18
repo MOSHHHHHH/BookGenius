@@ -10,7 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/abcjs@6/dist/abcjs-basic-min.js"></script>
-<script>MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$'],['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea']}};</script>
+<script>MathJax={tex:{inlineMath:[['\\(','\\')']], displayMath:[['\\[','\\]']]},options:{skipHtmlTags:['script','noscript','style','textarea','p','h1','h2','h3'],processHtmlClass:'math-wrap'},startup:{typeset:false}};</script>
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" id="MathJax-script"></script>
 <style>
 :root {
@@ -1403,10 +1403,15 @@ function renderBlock(block, chNum){
       return `<div class="table-wrap"><table>${cap}<thead><tr>${headers}</tr></thead><tbody>${rows}</tbody></table></div>`;
     }
     case 'math':{
-      // LaTeX must NOT be HTML-escaped — MathJax reads the raw delimiters
-      const latex=block.latex||'';
+      // Wrap in explicit \[...\] so MathJax only processes this element.
+      // Strip any outer $$ or $ the LLM may have added, then re-wrap cleanly.
+      let latex=(block.latex||'').trim()
+        .replace(/^\$\$|\$\$$/g,'')   // strip $$ wrappers
+        .replace(/^\$|\$$/g,'')       // strip $ wrappers
+        .replace(/^\\\[|\\\]$/g,'')   // strip \[ \] wrappers
+        .trim();
       const uid='mj_'+chNum+'_'+Math.random().toString(36).slice(2,7);
-      return `<div class="math-wrap" id="${uid}">${latex}</div>${block.caption?`<div class="math-caption">${esc(block.caption)}</div>`:''}`;
+      return `<div class="math-wrap" id="${uid}">\\[${latex}\\]</div>${block.caption?`<div class="math-caption">${esc(block.caption)}</div>`:''}`;
     }
     default: return '';
   }
@@ -1458,12 +1463,12 @@ function renderBook(container){
     container.querySelectorAll('pre code').forEach(el=>Prism.highlightElement(el));
   }
 
-  // Typeset math (MathJax) — un-escape LaTeX stored as HTML entities then typeset
-  container.querySelectorAll('.math-latex').forEach(el=>{
-    el.textContent=el.textContent; // entities already decoded by browser
-  });
+  // Render math (MathJax) — only process .math-wrap divs, never the surrounding text
   if(window.MathJax&&window.MathJax.typesetPromise){
-    MathJax.typesetPromise([container]).catch(e=>console.warn('MathJax error:',e));
+    const mathEls=Array.from(container.querySelectorAll('.math-wrap'));
+    if(mathEls.length){
+      MathJax.typesetPromise(mathEls).catch(e=>console.warn('MathJax error:',e));
+    }
   }
 }
 
@@ -1484,7 +1489,7 @@ function getBookHTML(forPrint){
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"><\/script>
-<script>MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']],displayMath:[['$$','$$'],['\\[','\\]']]}};<\/script>
+<script>MathJax={tex:{inlineMath:[['\\(','\\)']],displayMath:[['\\[','\\]']]},startup:{typeset:false}};<\/script>
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"><\/script>
 <style>
 *{box-sizing:border-box}
@@ -1526,7 +1531,7 @@ pre code{font-family:'Fira Code',monospace;font-size:.79rem}
 }
 </style>
 </head>
-<body>${body}<script>if(window.Prism)Prism.highlightAll();if(window.MathJax&&MathJax.typesetPromise)MathJax.typesetPromise();${printScript}<\/script></body>
+<body>${body}<script>if(window.Prism)Prism.highlightAll();if(window.MathJax&&MathJax.typesetPromise){var mels=document.querySelectorAll('.math-wrap');if(mels.length)MathJax.typesetPromise(Array.from(mels));}${printScript}<\/script></body>
 </html>`;
 }
 
