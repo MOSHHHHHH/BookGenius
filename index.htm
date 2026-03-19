@@ -143,6 +143,11 @@ body{
 .btn-dark:hover{border-color:var(--gold);color:var(--gold)}
 .btn-green{background:rgba(29,233,139,.1);color:var(--green);border:1.5px solid rgba(29,233,139,.3)}
 .btn-green:hover{background:rgba(29,233,139,.18)}
+.btn-danger{
+  background:rgba(255,77,109,.12);color:var(--red);
+  border:1.5px solid rgba(255,77,109,.35);
+}
+.btn-danger:hover{background:rgba(255,77,109,.22);transform:translateY(-1px)}
 /* Skill badges */
 .skill-badge{
   display:inline-flex;align-items:center;gap:6px;
@@ -313,13 +318,16 @@ body{
   background:rgba(0,0,0,.78);z-index:1000;
   align-items:center;justify-content:center;padding:1rem;
 }
-.modal-overlay.open{display:flex}
+.modal-overlay.open{display:flex;animation:modalIn .2s cubic-bezier(.25,.46,.45,.94)}
+@keyframes modalIn{from{opacity:0}to{opacity:1}}
 .modal-box{
   background:var(--surface);border:1px solid var(--border);
   border-radius:16px;width:100%;max-width:740px;
   max-height:90vh;display:flex;flex-direction:column;overflow:hidden;
   box-shadow:0 30px 70px rgba(0,0,0,.6);
+  animation:modalBoxIn .22s cubic-bezier(.34,1.56,.64,1);
 }
+@keyframes modalBoxIn{from{transform:scale(.94) translateY(10px)}to{transform:scale(1) translateY(0)}}
 .modal-header{
   padding:16px 20px;border-bottom:1px solid var(--border);
   display:flex;justify-content:space-between;align-items:center;
@@ -334,6 +342,16 @@ body{
   border-radius:6px;transition:color .2s;
 }
 .modal-close:hover{color:var(--text)}
+/* ── CONFIRM MODAL ── */
+.confirm-icon{
+  width:56px;height:56px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.45rem;flex-shrink:0;
+  margin:0 auto 14px;
+}
+.confirm-icon.danger{background:rgba(255,77,109,.12);border:1.5px solid rgba(255,77,109,.3)}
+.confirm-icon.warn  {background:rgba(232,185,35,.12);border:1.5px solid rgba(232,185,35,.35)}
+.confirm-icon.info  {background:rgba(29,233,139,.12);border:1.5px solid rgba(29,233,139,.3)}
 /* Table rendering in book */
 .table-wrap{margin:1.5rem 0;overflow-x:auto}
 .table-wrap table{
@@ -629,6 +647,21 @@ body{
   </div>
 </div>
 
+<!-- ══ CONFIRM MODAL ══ -->
+<div id="confirmModal" class="modal-overlay" onclick="confirmBackdropClick(event)">
+  <div class="modal-box" style="max-width:420px">
+    <div style="padding:32px 28px 24px;text-align:center;flex:1">
+      <div class="confirm-icon" id="confirmIcon"></div>
+      <h3 id="confirmTitle" style="font-size:1.05rem;font-weight:900;margin-bottom:10px;color:var(--text)"></h3>
+      <p id="confirmMsg" style="font-size:.86rem;color:var(--muted);line-height:1.75;white-space:pre-line"></p>
+    </div>
+    <div class="modal-footer" style="justify-content:center;gap:10px;padding:16px 24px 20px">
+      <button id="confirmCancelBtn" onclick="confirmResolve(false)" class="btn btn-ghost" style="min-width:100px"></button>
+      <button id="confirmOkBtn"     onclick="confirmResolve(true)"  class="btn btn-primary" style="min-width:110px"></button>
+    </div>
+  </div>
+</div>
+
 <!-- ============================================================
      JAVASCRIPT
      ============================================================ -->
@@ -651,8 +684,8 @@ let S = {
 // ─────────────────────────────────────────────
 // AUTO-CLEAR CONSTANTS & REGISTRY
 // ─────────────────────────────────────────────
-const AC_SECS = 5;      // seconds before auto-clear fires
-const _acTimers = {};   // registry: taId → intervalId, taId+'_fn' → listener ref
+const AC_SECS = 5;
+const _acTimers = {};
 
 // ─────────────────────────────────────────────
 // UTILS
@@ -675,18 +708,56 @@ function showErr(elId,msgId,msg){$(elId).classList.add('show');$(msgId).textCont
 function hideErr(elId){$(elId).classList.remove('show');}
 
 // ─────────────────────────────────────────────
-// AUTO-CLEAR  — start / cancel
+// CUSTOM CONFIRM MODAL
 // ─────────────────────────────────────────────
+let _confirmResolve = null;
 
 /**
- * Start a countdown that clears `taId` after AC_SECS seconds.
- * Cancelled immediately if the user focuses or clicks the textarea.
- * @param {string} taId      – textarea element id
- * @param {string} badgeId   – countdown badge span id (inside err row)
- * @param {string} errRowId  – err-msg row id (hidden when cleared)
+ * Show a styled in-app confirm dialog.
+ * @param {Object} opts
+ * @param {string} opts.title
+ * @param {string} opts.message
+ * @param {string} [opts.confirmLabel='אישור']
+ * @param {string} [opts.cancelLabel='ביטול']
+ * @param {'warn'|'danger'|'info'} [opts.variant='warn']
+ * @returns {Promise<boolean>}
  */
+function showConfirm({ title, message, confirmLabel = 'אישור', cancelLabel = 'ביטול', variant = 'warn' }) {
+  return new Promise(resolve => {
+    _confirmResolve = resolve;
+
+    $('confirmTitle').textContent   = title;
+    $('confirmMsg').textContent     = message;
+    $('confirmOkBtn').textContent   = confirmLabel;
+    $('confirmCancelBtn').textContent = cancelLabel;
+
+    const iconMap = { danger: '🗑️', warn: '⚠️', info: 'ℹ️' };
+    const icon = $('confirmIcon');
+    icon.className   = 'confirm-icon ' + variant;
+    icon.textContent = iconMap[variant] || '⚠️';
+
+    // Swap confirm button style for destructive actions
+    $('confirmOkBtn').className = 'btn ' + (variant === 'danger' ? 'btn-danger' : 'btn-primary');
+
+    $('confirmModal').classList.add('open');
+  });
+}
+
+function confirmResolve(result) {
+  $('confirmModal').classList.remove('open');
+  if (_confirmResolve) { _confirmResolve(result); _confirmResolve = null; }
+}
+
+// Close confirm modal when clicking the dark backdrop (but not the box itself)
+function confirmBackdropClick(e) {
+  if (e.target === $('confirmModal')) confirmResolve(false);
+}
+
+// ─────────────────────────────────────────────
+// AUTO-CLEAR  — start / cancel
+// ─────────────────────────────────────────────
 function startAutoClear(taId, badgeId, errRowId){
-  cancelAutoClear(taId);                    // reset any existing timer first
+  cancelAutoClear(taId);
   const ta = $(taId);
   if(!ta) return;
 
@@ -695,7 +766,6 @@ function startAutoClear(taId, badgeId, errRowId){
   const badge = $(badgeId);
   if(badge){ badge.textContent = '⏱ נוקה בעוד '+secs+'...'; badge.style.display='inline-flex'; }
 
-  // Cancel as soon as the user tries to interact with the field
   const cancelFn = () => cancelAutoClear(taId);
   _acTimers[taId+'_fn'] = cancelFn;
   ta.addEventListener('focus', cancelFn, {once:true});
@@ -712,19 +782,13 @@ function startAutoClear(taId, badgeId, errRowId){
   }, 1000);
 }
 
-/**
- * Cancel a running auto-clear for `taId` — clears interval,
- * removes .clearing class, hides badge, removes stored listeners.
- */
 function cancelAutoClear(taId){
   if(_acTimers[taId]){ clearInterval(_acTimers[taId]); delete _acTimers[taId]; }
   const ta = $(taId);
   if(ta) ta.classList.remove('clearing');
-  // Derive badge id by convention (only two paste boxes exist)
   const badgeId = (taId === 'tocInput') ? 'tocCountdown' : 'chCountdown';
   const badge = $(badgeId);
   if(badge) badge.style.display='none';
-  // Remove the cancel listener we stored
   const fn = _acTimers[taId+'_fn'];
   if(fn && ta){ ta.removeEventListener('focus', fn); ta.removeEventListener('click', fn); }
   if(_acTimers[taId+'_fn']) delete _acTimers[taId+'_fn'];
@@ -733,8 +797,6 @@ function cancelAutoClear(taId){
 // ─────────────────────────────────────────────
 // ROBUST JSON REPAIR (multi-pass)
 // ─────────────────────────────────────────────
-
-/* Pass 1 — fix bare control chars inside JSON strings (state machine). */
 function repairControlChars(str){
   let out='', inStr=false, i=0;
   while(i<str.length){
@@ -755,12 +817,8 @@ function repairControlChars(str){
   return out;
 }
 
-/* Pass 2 — remove trailing commas before } or ] */
 function fixTrailingCommas(s){ return s.replace(/,(\s*[}\]])/g,'$1'); }
 
-/* Pass 3 — re-normalise code/abc/fen field values using a manual scanner.
-   BUG FIX: replaced (?<!\\) lookbehind (limited browser support) with an
-   explicit escape-aware character scan. */
 function repairCodeFields(str){
   const re = /"(code|abc|fen)"\s*:\s*"/g;
   let result='', lastIdx=0, m;
@@ -769,7 +827,6 @@ function repairCodeFields(str){
     const key = m[1];
     let j = re.lastIndex;
     let raw = '';
-    // Walk value, honouring \X escape pairs, stop at unescaped closing "
     while(j < str.length){
       if(str[j]==='\\'){
         raw += str[j]+(str[j+1]||'');
@@ -780,8 +837,6 @@ function repairCodeFields(str){
         raw += str[j++];
       }
     }
-    // Escape any literal control chars that slipped through
-    // (already-escaped sequences like \n \t \\ are left untouched)
     const safe = raw
       .replace(/\n/g,'\\n')
       .replace(/\r/g,'\\r')
@@ -794,7 +849,6 @@ function repairCodeFields(str){
   return result;
 }
 
-/* Try to parse JSON using increasingly aggressive repair strategies. */
 function robustParse(raw){
   let s=raw.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
   const m=s.match(/\{[\s\S]*\}/);
@@ -906,12 +960,19 @@ function goStep(n){
   save();
 }
 
-function resetApp(){
-  if(confirm('לאפס הכל? כל נתוני הספר יימחקו.')){
-    cancelAutoClear('tocInput');
-    cancelAutoClear('chapterInput');
-    localStorage.removeItem(SK);location.reload();
-  }
+async function resetApp(){
+  const ok = await showConfirm({
+    title: 'איפוס הספר',
+    message: 'כל נתוני הספר יימחקו לצמיתות.\nפעולה זו אינה ניתנת לביטול.',
+    confirmLabel: 'מחק הכל',
+    cancelLabel: 'ביטול',
+    variant: 'danger'
+  });
+  if (!ok) return;
+  cancelAutoClear('tocInput');
+  cancelAutoClear('chapterInput');
+  localStorage.removeItem(SK);
+  location.reload();
 }
 
 // ─────────────────────────────────────────────
@@ -1186,7 +1247,7 @@ function step1Submit(){
 // STEP 3 — Process TOC
 // ─────────────────────────────────────────────
 function processTOC(){
-  cancelAutoClear('tocInput');        // cancel any running countdown
+  cancelAutoClear('tocInput');
   hideErr('tocErr');
   $('tocRepairWrap').style.display='none';
   const raw=$('tocInput').value.trim();
@@ -1207,9 +1268,7 @@ function processTOC(){
     setupDashboard();
   }catch(e){
     showErr('tocErr','tocErrMsg', e.message);
-    // Start auto-clear countdown so the user can easily re-paste corrected JSON
     if(raw) startAutoClear('tocInput','tocCountdown','tocErr');
-    // Build and show fix prompt
     if(raw){
       const fp=buildFixPrompt(buildTOCPrompt(), raw, e.message);
       $('tocRepairPrompt').value=fp;
@@ -1253,7 +1312,7 @@ function renderSidebar(){
 }
 
 function loadChapter(chNum){
-  cancelAutoClear('chapterInput');   // cancel any running countdown when switching chapters
+  cancelAutoClear('chapterInput');
   S.curCh=chNum;
   const allChs=S.toc.chapters.slice().sort((a,b)=>a.chapter_number-b.chapter_number);
   const startIdx=allChs.findIndex(c=>c.chapter_number===chNum);
@@ -1298,7 +1357,7 @@ function setChTab(tab){
   $('tabPrompt').classList.toggle('active',isP);
   $('tabPaste').classList.toggle('active',!isP);
   if(isP){
-    cancelAutoClear('chapterInput');   // cancel countdown when switching back to prompt tab
+    cancelAutoClear('chapterInput');
     $('chRepairWrap').style.display='none';
     setTimeout(()=>copyText('chapterPrompt','badge4'),250);
   }
@@ -1317,8 +1376,8 @@ function showRepairPrompt(raw, errMsg){
   setTimeout(()=>copyText('repairPrompt','badgeRepair'),200);
 }
 
-function processChapter(){
-  cancelAutoClear('chapterInput');    // cancel any running countdown
+async function processChapter(){
+  cancelAutoClear('chapterInput');
   hideErr('chErr');
   $('chRepairWrap').style.display='none';
   const raw=$('chapterInput').value.trim();
@@ -1367,8 +1426,16 @@ function processChapter(){
     // ── Overwrite warning ────────────────────────────────────────
     const overwrites=stored.filter(s=>S.done[s.chNum]!==undefined);
     if(overwrites.length){
-      const ns=overwrites.map(s=>s.chNum).join(', ');
-      if(!confirm(`פרק${overwrites.length>1?'ים':''} ${ns} כבר קיי${overwrites.length>1?'מים':'ם'}. האם לדרוס?`))return;
+      const ns = overwrites.map(s => s.chNum === 0 ? 'מבוא' : 'פרק ' + s.chNum).join(', ');
+      const plural = overwrites.length > 1;
+      const ok = await showConfirm({
+        title: plural ? 'דריסת פרקים קיימים' : 'דריסת פרק קיים',
+        message: `${ns} כבר ${plural ? 'קיימים' : 'קיים'} ויכתב מחדש.\nהאם להמשיך ולדרוס?`,
+        confirmLabel: 'דרוס ושמור',
+        cancelLabel: 'ביטול',
+        variant: 'warn'
+      });
+      if(!ok) return;
     }
 
     // ── Save ─────────────────────────────────────────────────────
@@ -1389,8 +1456,6 @@ function processChapter(){
     save();
   }catch(e){
     showErr('chErr','chErrMsg',e.message);
-    // Start auto-clear so user can easily re-paste corrected JSON
-    // Only trigger if there was actual content that failed (not the empty-field error)
     const raw2=$('chapterInput').value.trim();
     if(raw2) startAutoClear('chapterInput','chCountdown','chErr');
   }
@@ -1445,8 +1510,6 @@ function saveEdit(){
 // ─────────────────────────────────────────────
 // RENDERERS
 // ─────────────────────────────────────────────
-
-/* Chess SVG from FEN */
 function chessFromFEN(fen){
   const P={'K':'♔','Q':'♕','R':'♖','B':'♗','N':'♘','P':'♙','k':'♚','q':'♛','r':'♜','b':'♝','n':'♞','p':'♟'};
   const pos=fen.split(' ')[0];
@@ -1485,10 +1548,6 @@ function chessFromFEN(fen){
   return svg;
 }
 
-/* Render one content block → HTML string.
-   BUG FIX: uses a monotonic counter (renderBlock._cnt) instead of
-   Math.random() so element IDs are deterministic and never collide
-   across re-renders. Counter is reset at the top of each renderBook() call. */
 function renderBlock(block, chNum){
   switch((block.type||'').toLowerCase()){
     case 'text':
@@ -1529,11 +1588,10 @@ function renderBlock(block, chNum){
     default: return '';
   }
 }
-renderBlock._cnt = 0;  // initialise counter
+renderBlock._cnt = 0;
 
-/* Render full book into container */
 function renderBook(container){
-  renderBlock._cnt = 0;  // BUG FIX: reset counter on each full render so IDs are stable
+  renderBlock._cnt = 0;
 
   const chs=S.toc.chapters.slice().sort((a,b)=>a.chapter_number-b.chapter_number);
   let html=`
@@ -1561,7 +1619,6 @@ function renderBook(container){
 
   container.innerHTML=html;
 
-  // Render music notation (abcjs)
   container.querySelectorAll('[data-abc]').forEach(el=>{
     const abc=decodeURIComponent(el.dataset.abc||'');
     if(!abc)return;
@@ -1574,12 +1631,10 @@ function renderBook(container){
     }catch(e){el.innerHTML=`<p style="color:red;font-size:.8rem">שגיאה בתווים: ${e.message}</p>`;}
   });
 
-  // Highlight code (Prism)
   if(window.Prism){
     container.querySelectorAll('pre code').forEach(el=>Prism.highlightElement(el));
   }
 
-  // Render math (MathJax)
   if(window.MathJax&&window.MathJax.typesetPromise){
     const mathEls=Array.from(container.querySelectorAll('.math-wrap'));
     if(mathEls.length){
@@ -1671,13 +1726,20 @@ function printBook(){
 // ─────────────────────────────────────────────
 // INIT
 // ─────────────────────────────────────────────
-(function init(){
+(async function init(){
   if(window.Prism&&window.Prism.plugins&&window.Prism.plugins.autoloader)
     Prism.plugins.autoloader.languages_path='https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
 
   const hasSaved=load();
   if(hasSaved&&S.step>1&&S.toc){
-    if(confirm('נמצא ספר שלא הושלם.\nהמשך מאיפה שהפסקת?')){
+    const resume = await showConfirm({
+      title: 'ספר לא הושלם',
+      message: `נמצא ספר שהתחלת לכתוב:\n"${S.toc.book_title || S.book.title}"\n\nהאם להמשיך מאיפה שהפסקת?`,
+      confirmLabel: 'המשך',
+      cancelLabel: 'התחל מחדש',
+      variant: 'info'
+    });
+    if(resume){
       restoreForm();
       if(S.step===5&&Object.keys(S.done).length===S.toc.chapters.length){
         $('bkSubtitle').textContent=`${S.toc.chapters.length} פרקים נכתבו בהצלחה — "${S.book.title}"`;
