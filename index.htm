@@ -210,10 +210,27 @@ mark.hl.cur{background:#e8b923;outline:2px solid #e8b923;border-radius:2px}
 @media print{
   body{background:white!important;padding:0}
   .book-preview{max-height:none;border-radius:0;background:white}
-  .bk-chapter{page-break-before:always}
+  .bk-chapter{page-break-before:always;break-before:page;}
   pre{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   svg{max-width:100%}
+  /* מניעת חיתוך בלוקים חשובים */
+  .chess-wrap,.music-wrap,.math-wrap,.code-wrap,.table-wrap{
+    break-inside:avoid;page-break-inside:avoid;}
+  /* כותרת לא תישאר לבד בסוף עמוד */
+  h2,h3{break-after:avoid;page-break-after:avoid;}
+  /* הסתרת אלמנטים שלא שייכים לדפוס */
+  .search-bar,#toastWrap,.app-header,.steps-bar,
+  #step1,#step2,#step3,#step4{display:none!important;}
 }
+/* ── PRINT WARNING MODAL ── */
+.print-step{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-radius:10px;background:var(--card);border:1px solid var(--border);}
+.print-step-num{width:24px;height:24px;border-radius:50%;background:var(--gold-dim);border:1.5px solid rgba(232,185,35,.4);color:var(--gold);font-size:.75rem;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.print-step-text{font-size:.84rem;color:var(--text);line-height:1.6;}
+.print-step-text b{color:var(--gold);}
+.print-step-text .sub{font-size:.76rem;color:var(--muted);margin-top:3px;}
+.noshow-row{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;margin-top:4px;}
+.noshow-row input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--gold);}
+.noshow-row span{font-size:.78rem;color:var(--muted);}
 </style>
 </head>
 <body>
@@ -394,6 +411,130 @@ mark.hl.cur{background:#e8b923;outline:2px solid #e8b923;border-radius:2px}
 </div>
 </div><!-- /.app -->
 <div id="toastWrap"></div>
+<!-- PRINT WARNING MODAL -->
+<div id="printModal" class="modal-overlay" onclick="if(event.target===this)closePrintModal()">
+  <div class="modal-box" style="max-width:500px">
+    <div class="modal-header">
+      <h3 style="font-size:.95rem;font-weight:800;display:flex;align-items:center;gap:8px">
+        <i class="fas fa-print" style="color:var(--gold)"></i> הכנה לייצוא PDF
+      </h3>
+      <button class="modal-close" onclick="closePrintModal()">✕</button>
+    </div>
+    <div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px;overflow-y:auto">
+      <p style="font-size:.84rem;color:var(--text);font-weight:600;line-height:1.55">הקובץ מוכן לייצוא / הדפסה. מומלץ לבצע את הפעולות הבאות בחלון שייפתח לייצוא מוצלח:</p>
+
+      <!-- Chrome print dialog schematic — direction:ltr forced to prevent RTL coordinate inversion -->
+      <svg viewBox="0 0 420 244" xmlns="http://www.w3.org/2000/svg"
+           style="width:100%;border-radius:10px;display:block;direction:ltr" direction="ltr">
+        <!-- Dialog background -->
+        <rect width="420" height="244" fill="#2d2e30" rx="8"/>
+        <!-- Title bar -->
+        <rect width="420" height="30" fill="#1e1f20" rx="8"/>
+        <rect y="22" width="420" height="8" fill="#1e1f20"/>
+        <!-- X button top-left -->
+        <circle cx="15" cy="15" r="7" fill="#454647"/>
+        <text x="11" y="19" font-family="sans-serif" font-size="10" fill="#9aa0a6">✕</text>
+        <!-- Title "הדפסה" right side -->
+        <text x="406" y="20" font-family="sans-serif" font-size="11" fill="#e8eaed" text-anchor="end">הדפסה</text>
+
+        <!-- Left preview panel -->
+        <rect x="8" y="34" width="100" height="202" fill="#3c4043" rx="4"/>
+        <rect x="15" y="41" width="86" height="188" fill="white" rx="2"/>
+        <rect x="21" y="51" width="74" height="4" fill="#e0e0e0" rx="1"/>
+        <rect x="21" y="59" width="62" height="3" fill="#ebebeb" rx="1"/>
+        <rect x="21" y="66" width="70" height="3" fill="#ebebeb" rx="1"/>
+        <rect x="21" y="77" width="74" height="3" fill="#f0f0f0" rx="1"/>
+        <rect x="21" y="84" width="56" height="3" fill="#f0f0f0" rx="1"/>
+        <rect x="21" y="91" width="68" height="3" fill="#f0f0f0" rx="1"/>
+        <rect x="21" y="102" width="74" height="3" fill="#f4f4f4" rx="1"/>
+        <rect x="21" y="109" width="50" height="3" fill="#f4f4f4" rx="1"/>
+        <rect x="21" y="116" width="66" height="3" fill="#f4f4f4" rx="1"/>
+
+        <!-- Separator -->
+        <line x1="112" y1="30" x2="112" y2="244" stroke="#404040" stroke-width="1"/>
+
+        <!-- Right settings panel -->
+        <rect x="112" y="30" width="280" height="214" fill="#202124"/>
+
+        <!-- ═══ ROW 1: יעד — GOLD ═══ -->
+        <rect x="114" y="36" width="270" height="52" fill="#272700" rx="3"/>
+        <rect x="114" y="36" width="3" height="52" fill="#e8b923" rx="1"/>
+        <!-- label -->
+        <text x="376" y="51" font-family="sans-serif" font-size="8.5" fill="#9aa0a6" text-anchor="end">יעד</text>
+        <!-- dropdown -->
+        <rect x="121" y="55" width="238" height="24" fill="#3c4043" rx="3"/>
+        <text x="131" y="71" font-family="sans-serif" font-size="9" fill="#9aa0a6">▾</text>
+        <text y="71" font-family="sans-serif" font-size="9" fill="#e8b923" font-weight="bold" style="direction:ltr">
+          <tspan x="131">PDF</tspan><tspan>-כ שמור</tspan>
+        </text>
+        <!-- callout ① -->
+        <circle cx="403" cy="62" r="10" fill="#e8b923"/>
+        <text x="403" y="66" font-family="sans-serif" font-size="11" fill="#1a1200" font-weight="bold" text-anchor="middle">1</text>
+        <line x1="393" y1="62" x2="360" y2="67" stroke="#e8b923" stroke-width="1.2" stroke-dasharray="3,2" opacity="0.7"/>
+
+        <!-- ═══ ROW 2: דפים / פריסה (greyed) ═══ -->
+        <text x="376" y="106" font-family="sans-serif" font-size="8.5" fill="#5f6368" text-anchor="end">דפים</text>
+        <rect x="121" y="109" width="76" height="13" fill="#3c4043" rx="2"/>
+        <text x="260" y="106" font-family="sans-serif" font-size="8.5" fill="#5f6368" text-anchor="end">פריסה</text>
+        <rect x="204" y="109" width="76" height="13" fill="#3c4043" rx="2"/>
+
+        <!-- ═══ ROW 3: הגדרות נוספות ═══ -->
+        <text x="376" y="136" font-family="sans-serif" font-size="8.5" fill="#8ab4f8" text-anchor="end">◂ הגדרות נוספות</text>
+        <line x1="114" y1="144" x2="384" y2="144" stroke="#333" stroke-width="1"/>
+
+        <!-- ═══ ROW 4: כותרות — RED ═══ -->
+        <rect x="114" y="148" width="270" height="52" fill="#270008" rx="3"/>
+        <rect x="114" y="148" width="3" height="52" fill="#ff4d6d" rx="1"/>
+        <!-- label -->
+        <text x="376" y="163" font-family="sans-serif" font-size="8" fill="#9aa0a6" text-anchor="end">כותרות עליונות ותחתונות</text>
+        <!-- checkbox unchecked -->
+        <rect x="121" y="167" width="13" height="13" fill="none" stroke="#9aa0a6" stroke-width="1.5" rx="2"/>
+        <!-- red X on checkbox -->
+        <line x1="123" y1="169" x2="132" y2="178" stroke="#ff4d6d" stroke-width="2" stroke-linecap="round"/>
+        <line x1="132" y1="169" x2="123" y2="178" stroke="#ff4d6d" stroke-width="2" stroke-linecap="round"/>
+        <text x="376" y="178" font-family="sans-serif" font-size="8" fill="#9aa0a6" text-anchor="end">← בטל סימון זה</text>
+        <!-- callout ② -->
+        <circle cx="403" cy="174" r="10" fill="#ff4d6d"/>
+        <text x="403" y="178" font-family="sans-serif" font-size="11" fill="white" font-weight="bold" text-anchor="middle">2</text>
+        <line x1="393" y1="174" x2="136" y2="174" stroke="#ff4d6d" stroke-width="1.2" stroke-dasharray="3,2" opacity="0.7"/>
+
+        <!-- Bottom bar -->
+        <rect x="112" y="212" width="280" height="32" fill="#1e1f20"/>
+        <rect x="119" y="218" width="62" height="18" fill="#3c4043" rx="3"/>
+        <text x="150" y="230" font-family="sans-serif" font-size="8.5" fill="#9aa0a6" text-anchor="middle">ביטול</text>
+        <rect x="188" y="218" width="72" height="18" fill="#1a73e8" rx="3"/>
+        <text x="224" y="230" font-family="sans-serif" font-size="8.5" fill="white" text-anchor="middle">הדפסה</text>
+      </svg>
+
+      <!-- Step descriptions -->
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="print-step">
+          <div class="print-step-num" style="background:rgba(232,185,35,.15);border-color:rgba(232,185,35,.4);color:var(--gold)">1</div>
+          <div class="print-step-text">
+            שנה <b>יעד</b> ל־<b>שמור כ-PDF</b>
+            <div class="sub">לחץ על הרשימה הנפתחת תחת "יעד" ובחר "שמור כ-PDF"</div>
+          </div>
+        </div>
+        <div class="print-step">
+          <div class="print-step-num" style="background:rgba(255,77,109,.12);border-color:rgba(255,77,109,.4);color:var(--red)">2</div>
+          <div class="print-step-text">
+            תחת <b>הגדרות נוספות</b> — בטל את <b>כותרות עליונות ותחתונות</b>
+            <div class="sub">מסיר URL ותאריך שהדפדפן מוסיף בשוליים</div>
+          </div>
+        </div>
+      </div>
+
+      <label class="noshow-row">
+        <input type="checkbox" id="printNoShowAgain">
+        <span>אל תציג הודעה זו שוב</span>
+      </label>
+    </div>
+    <div class="modal-footer" style="gap:10px">
+      <button onclick="closePrintModal()" class="btn btn-ghost">ביטול</button>
+      <button onclick="confirmPrint()" class="btn btn-primary"><i class="fas fa-print"></i> הבנתי, המשך להדפסה</button>
+    </div>
+  </div>
+</div>
 <!-- CONFIRM MODAL -->
 <div id="confirmModal" class="modal-overlay" onclick="confirmBdClick(event)">
   <div class="modal-box" style="max-width:420px">
@@ -453,11 +594,13 @@ function showConfirm({title,message,confirmLabel='אישור',cancelLabel='בי�
   return new Promise(res=>{
     _confirmRes=res;
     $('confirmTitle').textContent=title; $('confirmMsg').textContent=message;
-    $('confirmOkBtn').textContent=confirmLabel; $('confirmCancelBtn').textContent=cancelLabel;
+    $('confirmCancelBtn').textContent=cancelLabel;
     const imap={danger:'🗑️',warn:'⚠️',info:'ℹ️'};
     $('confirmIcon').className='confirm-icon '+variant;
     $('confirmIcon').textContent=imap[variant]||'⚠️';
+    const okIcon={danger:'fa-trash',warn:'fa-save',info:'fa-play'}[variant]||'fa-check';
     $('confirmOkBtn').className='btn '+(variant==='danger'?'btn-danger':'btn-primary');
+    $('confirmOkBtn').innerHTML=`<i class="fas ${okIcon}" style="font-size:.78rem"></i> ${esc(confirmLabel)}`;
     $('confirmModal').classList.add('open');
   });
 }
@@ -467,6 +610,7 @@ function confirmBdClick(e){if(e.target===$('confirmModal'))confirmResolve(false)
 /* ── KEYBOARD SHORTCUTS ── */
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
+    if($('printModal').classList.contains('open')){closePrintModal();return;}
     if($('confirmModal').classList.contains('open')){confirmResolve(false);return;}
   }
   if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){
@@ -899,13 +1043,22 @@ function renderBook(container,isPartial){
 }
 
 /* ── DOWNLOAD / PRINT ── */
+function getCoverPageHTML(){
+  const title=esc(S.book.title);
+  const desc=esc(S.toc?(S.toc.book_description||S.book.desc):S.book.desc);
+  return `<div class="cover-page"><div class="cover-inner"><div class="cover-accent"></div><h1 class="cover-title">${title}</h1><p class="cover-desc">${desc}</p><div class="cover-footer"><span>נוצר באמצעות</span><strong>BookGenius</strong><a href="https://moshhhhhh.github.io/BookGenius/" class="cover-url">moshhhhhh.github.io/BookGenius</a></div></div></div>`;
+}
+
+const COVER_CSS=`.cover-page{width:100%;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#fff;page-break-after:always;break-after:page;}.cover-inner{max-width:520px;width:100%;text-align:center;padding:3rem 2rem;display:flex;flex-direction:column;align-items:center;gap:1.6rem;}.cover-accent{width:64px;height:5px;background:linear-gradient(90deg,#4a1aaa,#7c68d0);border-radius:3px;margin-bottom:.5rem;}.cover-title{font-size:2.6rem;font-weight:900;color:#110d33;line-height:1.2;letter-spacing:-.02em;margin:0;}.cover-desc{font-size:1rem;color:#555;line-height:1.8;margin:0;max-width:420px;}.cover-footer{margin-top:auto;padding-top:2rem;border-top:1px solid #e8e6f0;width:100%;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:.8rem;color:#888;}.cover-footer strong{font-size:.95rem;color:#4a1aaa;font-weight:800;letter-spacing:.02em;}.cover-url{font-size:.75rem;color:#7c68d0;text-decoration:none;direction:ltr;}@media print{.cover-page{min-height:100vh;}@page :first{margin:0;}body{margin:0;}body>:not(.cover-page){margin-top:0;}}`;
+
 function getBookHTML(forPrint){
   const clone=$('bookPreview').cloneNode(true);
   clone.querySelectorAll('[data-abc]').forEach(el=>el.removeAttribute('data-abc'));
   clone.querySelectorAll('mark.hl').forEach(m=>m.replaceWith(document.createTextNode(m.textContent)));
   const body=clone.innerHTML;
+  const cover=getCoverPageHTML();
   const ps=forPrint?'setTimeout(()=>window.print(),800);':'';
-  return `<!DOCTYPE html><html lang="he" dir="rtl"><head><meta charset="UTF-8"><title>${esc(S.book.title)}</title><link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"><\/script><script>MathJax={tex:{inlineMath:[['\\(','\\)']],displayMath:[['\\[','\\]']]},startup:{typeset:false}};<\/script><script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"><\/script><style>*{box-sizing:border-box}body{font-family:'Heebo',sans-serif;max-width:820px;margin:0 auto;padding:3rem 2rem 5rem;color:#18181e;background:#fff;direction:rtl}h1{font-size:2.2rem;font-weight:900;text-align:center;margin-bottom:.4rem;color:#110d33}h2{font-size:1.45rem;font-weight:900;color:#2a1660;margin:0 0 .9rem}h3{font-size:1.05rem;font-weight:800;color:#3a22a0;margin:1.4rem 0 .5rem}p{line-height:1.95;margin-bottom:1rem;text-align:justify}hr{border:none;border-top:1px solid #e0e0ef;margin:2rem 0}.bk-subtitle{text-align:center;color:#666;margin-bottom:2.5rem;font-size:.95rem}.bk-partial-notice{background:#fff8e1;border:2px solid #f5c842;border-radius:10px;padding:14px 18px;margin-bottom:2rem}.bk-partial-notice .pn-title{font-size:.9rem;font-weight:900;color:#7a5500;margin-bottom:4px}.bk-partial-notice p{font-size:.82rem;color:#8a6800;line-height:1.6}.bk-chapter{margin-top:3.5rem;padding-top:2.5rem;border-top:3px solid #ece8ff}.bk-ch-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.12em;color:#7c68d0;font-weight:800;margin-bottom:.25rem}.toc-entry{display:flex;align-items:baseline;gap:8px;padding:5px 0;font-size:.88rem;text-decoration:none;color:inherit;}.toc-num{color:#888;font-size:.76rem;white-space:nowrap}.toc-dots{flex:1;border-bottom:1px dotted #ccc}.toc-missing span:last-child{color:#bbb;font-style:italic}.chess-wrap{display:flex;flex-direction:column;align-items:center;margin:1.5rem 0}.chess-wrap svg{border:2px solid #8b6914;border-radius:3px}.chess-caption{font-size:.8rem;color:#666;margin-top:7px;font-style:italic;text-align:center}.music-wrap{direction:ltr;background:#f3f2ff;border-radius:10px;padding:1rem 1.2rem;margin:1.2rem 0}.music-caption{font-size:.8rem;color:#666;margin-top:5px;font-style:italic;text-align:center;direction:rtl}.code-wrap{margin:1.5rem 0}.code-header{background:#21252e;color:#8892a4;font-family:'Fira Code',monospace;font-size:.71rem;padding:7px 14px;border-radius:10px 10px 0 0;display:flex;justify-content:space-between;direction:ltr}.code-header+pre{border-radius:0 0 10px 10px!important;margin:0!important}pre{border-radius:10px;overflow-x:auto}pre code{font-family:'Fira Code',monospace;font-size:.79rem}.table-wrap{margin:1.5rem 0;overflow-x:auto}.table-wrap table{width:100%;border-collapse:collapse;font-size:.88rem;direction:rtl;border:1px solid #dde}.table-wrap th{background:#2a1660;color:#fff;padding:9px 14px;font-weight:700;text-align:right}.table-wrap td{padding:8px 14px;border-bottom:1px solid #eee;text-align:right}.table-wrap tr:last-child td{border-bottom:none}.table-wrap tr:nth-child(even) td{background:#f5f4ff}.table-caption{caption-side:bottom;text-align:center;font-size:.78rem;color:#888;font-style:italic;padding-top:6px}.math-wrap{margin:1.5rem 0;padding:1rem 1.5rem;background:#fafafe;border-radius:10px;border:1px solid #e8e6ff;text-align:center;direction:ltr;overflow-x:auto}.math-caption{font-size:.8rem;color:#888;margin-top:6px;font-style:italic;direction:rtl;text-align:center}@media print{.bk-chapter{page-break-before:always}pre{-webkit-print-color-adjust:exact;print-color-adjust:exact}svg{max-width:100%}}<\/style><\/head><body>${body}<script>if(window.Prism)Prism.highlightAll();if(window.MathJax&&MathJax.typesetPromise){var m=document.querySelectorAll('.math-wrap');if(m.length)MathJax.typesetPromise(Array.from(m));}${ps}<\/script><\/body><\/html>`;
+  return `<!DOCTYPE html><html lang="he" dir="rtl"><head><meta charset="UTF-8"><title>${esc(S.book.title)}</title><link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"><\/script><script>MathJax={tex:{inlineMath:[['\\(','\\)']],displayMath:[['\\[','\\]']]},startup:{typeset:false}};<\/script><script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"><\/script><style>*{box-sizing:border-box}body{font-family:'Heebo',sans-serif;max-width:820px;margin:0 auto;padding:0 2rem 5rem;color:#18181e;background:#fff;direction:rtl}h1{font-size:2.2rem;font-weight:900;text-align:center;margin-bottom:.4rem;color:#110d33}h2{font-size:1.45rem;font-weight:900;color:#2a1660;margin:0 0 .9rem}h3{font-size:1.05rem;font-weight:800;color:#3a22a0;margin:1.4rem 0 .5rem}p{line-height:1.95;margin-bottom:1rem;text-align:justify}hr{border:none;border-top:1px solid #e0e0ef;margin:2rem 0}.bk-subtitle{text-align:center;color:#666;margin-bottom:2.5rem;font-size:.95rem}.bk-partial-notice{background:#fff8e1;border:2px solid #f5c842;border-radius:10px;padding:14px 18px;margin-bottom:2rem}.bk-partial-notice .pn-title{font-size:.9rem;font-weight:900;color:#7a5500;margin-bottom:4px}.bk-partial-notice p{font-size:.82rem;color:#8a6800;line-height:1.6}.bk-chapter{margin-top:3.5rem;padding-top:2.5rem;border-top:3px solid #ece8ff}.bk-ch-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.12em;color:#7c68d0;font-weight:800;margin-bottom:.25rem}.toc-entry{display:flex;align-items:baseline;gap:8px;padding:5px 0;font-size:.88rem;text-decoration:none;color:inherit;}.toc-num{color:#888;font-size:.76rem;white-space:nowrap}.toc-dots{flex:1;border-bottom:1px dotted #ccc}.toc-missing span:last-child{color:#bbb;font-style:italic}.chess-wrap{display:flex;flex-direction:column;align-items:center;margin:1.5rem 0}.chess-wrap svg{border:2px solid #8b6914;border-radius:3px}.chess-caption{font-size:.8rem;color:#666;margin-top:7px;font-style:italic;text-align:center}.music-wrap{direction:ltr;background:#f3f2ff;border-radius:10px;padding:1rem 1.2rem;margin:1.2rem 0}.music-caption{font-size:.8rem;color:#666;margin-top:5px;font-style:italic;text-align:center;direction:rtl}.code-wrap{margin:1.5rem 0}.code-header{background:#21252e;color:#8892a4;font-family:'Fira Code',monospace;font-size:.71rem;padding:7px 14px;border-radius:10px 10px 0 0;display:flex;justify-content:space-between;direction:ltr}.code-header+pre{border-radius:0 0 10px 10px!important;margin:0!important}pre{border-radius:10px;overflow-x:auto}pre code{font-family:'Fira Code',monospace;font-size:.79rem}.table-wrap{margin:1.5rem 0;overflow-x:auto}.table-wrap table{width:100%;border-collapse:collapse;font-size:.88rem;direction:rtl;border:1px solid #dde}.table-wrap th{background:#2a1660;color:#fff;padding:9px 14px;font-weight:700;text-align:right}.table-wrap td{padding:8px 14px;border-bottom:1px solid #eee;text-align:right}.table-wrap tr:last-child td{border-bottom:none}.table-wrap tr:nth-child(even) td{background:#f5f4ff}.table-caption{caption-side:bottom;text-align:center;font-size:.78rem;color:#888;font-style:italic;padding-top:6px}.math-wrap{margin:1.5rem 0;padding:1rem 1.5rem;background:#fafafe;border-radius:10px;border:1px solid #e8e6ff;text-align:center;direction:ltr;overflow-x:auto}.math-caption{font-size:.8rem;color:#888;margin-top:6px;font-style:italic;direction:rtl;text-align:center}@media print{.bk-chapter{page-break-before:always;break-before:page;}pre{-webkit-print-color-adjust:exact;print-color-adjust:exact}svg{max-width:100%}}${COVER_CSS}<\/style><\/head><body>${cover}${body}<script>if(window.Prism)Prism.highlightAll();if(window.MathJax&&MathJax.typesetPromise){var m=document.querySelectorAll('.math-wrap');if(m.length)MathJax.typesetPromise(Array.from(m));}${ps}<\/script><\/body><\/html>`;
 }
 function downloadHTML(){
   const html=getBookHTML(false);
@@ -916,9 +1069,29 @@ function downloadHTML(){
   a.click();URL.revokeObjectURL(url);
 }
 function printBook(){
-  const w=window.open('','_blank');
-  if(!w){toast('אנא אפשר חלונות קופצים ונסה שוב','err');return;}
-  w.document.write(getBookHTML(true));w.document.close();
+  if(localStorage.getItem('bg_print_skip')==='1'){
+    _doPrint();
+  } else {
+    $('printNoShowAgain').checked=false;
+    $('printModal').classList.add('open');
+  }
+}
+function closePrintModal(){
+  $('printModal').classList.remove('open');
+}
+function confirmPrint(){
+  if($('printNoShowAgain').checked) localStorage.setItem('bg_print_skip','1');
+  closePrintModal();
+  _doPrint();
+}
+function _doPrint(){
+  toast('מכין את הספר לייצוא...','info',2500);
+  setTimeout(()=>{
+    const w=window.open('','_blank');
+    if(!w){toast('אנא אפשר חלונות קופצים ונסה שוב','err');return;}
+    w.document.write(getBookHTML(true));
+    w.document.close();
+  },300);
 }
 
 /* ── INIT ── */
