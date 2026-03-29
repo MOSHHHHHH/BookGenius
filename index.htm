@@ -767,7 +767,7 @@ function chapterSchema(chNums){
   if(!Array.isArray(chNums))chNums=[chNums];
   const ns=chNums.join(', '),isM=chNums.length>1;
   const ct=[
-    `{"description":"Paragraph of text","properties":{"type":{"const":"text"},"text":{"type":"string"}},"required":["type","text"]}`,
+    `{"description":"Paragraph of text. To bold a word or phrase wrap it in double asterisks: **like this**. Use bold sparingly for key terms only.","properties":{"type":{"const":"text"},"text":{"type":"string"}},"required":["type","text"]}`,
     `{"description":"Section sub-heading","properties":{"type":{"const":"heading"},"text":{"type":"string"}},"required":["type","text"]}`,
     `{"description":"Highlighted callout box — use for tips, warnings, important notes, or errors. Pick the most fitting variant.","properties":{"type":{"const":"callout"},"variant":{"type":"string","enum":["tip","warning","info","error"],"description":"tip=💡 advice, warning=⚠️ caution, info=ℹ️ context, error=❌ common mistake"},"title":{"type":"string","description":"Short bold header in Hebrew, e.g. טיפ, שים לב, חשוב לדעת"},"text":{"type":"string","description":"Body of the callout in Hebrew"}},"required":["type","variant","title","text"]}`,
     `{"description":"Styled blockquote — for citations, quotes from people, or highlighted excerpts. Use sparingly.","properties":{"type":{"const":"blockquote"},"text":{"type":"string","description":"The quoted text in Hebrew"},"author":{"type":"string","description":"Attribution — name, source, or book (optional)"}},"required":["type","text"]}`,
@@ -1044,7 +1044,7 @@ function renderBlock(b,cn){
     }
     case 'blockquote':
       return`<div class="bk-blockquote"><p>${esc(b.text||'').replace(/\n/g,'<br>')}</p>${b.author?`<div class="bq-author">— ${esc(b.author)}</div>`:''}</div>`;
-    case 'text':return`<p>${esc(b.text||'').replace(/\n/g,'<br>')}</p>`;
+    case 'text':return`<p>${esc(b.text||'').replace(/\n/g,'<br>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')}</p>`;
     case 'heading':return`<h3>${esc(b.text||'')}</h3>`;
     case 'chess':{let bd='';try{bd=chessFromFEN(b.fen);}catch(e){bd=`<p style="color:red;font-size:.8rem">שגיאה ב-FEN: ${b.fen}</p>`;}return`<div class="chess-wrap">${bd}${b.caption?`<div class="chess-caption">${esc(b.caption)}</div>`:''}</div>`;}
     case 'music':{const uid='m_'+cn+'_'+(++renderBlock._c);return`<div class="music-wrap"><div id="${uid}" data-abc="${encodeURIComponent(b.abc||'')}" style="min-height:60px"></div>${b.caption?`<div class="music-caption">${esc(b.caption)}</div>`:''}</div>`;}
