@@ -2,6 +2,7 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
+  
 <link rel="icon" type="image/svg+xml" href="logo.svg">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -1291,5 +1292,56 @@ function _doPrint(){
   if(localStorage.getItem('bg_welcome_skip')!=='1')$('welcomeModal').classList.add('open');
 })();
 </script>
+  /* --- הערה חשובה: סקריפט זמני בלבד - יש להסיר לאחר סיום עבודות התחזוקה --- */
+
+(function() {
+    const banner = document.createElement('div');
+    banner.id = 'maintenance-banner';
+    
+    Object.assign(banner.style, {
+        position: 'fixed',
+        top: '0',
+        left: '0',
+        width: '100%',
+        backgroundColor: '#fff3cd',
+        color: '#856404',
+        padding: '10px 20px',
+        textAlign: 'center',
+        borderBottom: '1px solid #ffeeba',
+        zIndex: '9999',
+        fontFamily: 'Arial, sans-serif',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+    });
+
+    const text = document.createElement('span');
+    text.innerText = 'האתר בשיפוצים, יתכנו שגיאות';
+    text.style.marginRight = '15px';
+    banner.appendChild(text);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.innerText = 'X';
+    Object.assign(closeBtn.style, {
+        backgroundColor: 'transparent',
+        border: '1px solid #856404',
+        borderRadius: '3px',
+        cursor: 'pointer',
+        padding: '2px 8px',
+        fontSize: '12px',
+        fontWeight: 'bold',
+        color: '#856404'
+    });
+
+    closeBtn.onclick = function() {
+        banner.remove();
+    };
+
+    banner.appendChild(closeBtn);
+    document.body.prepend(banner);
+})();
+
+/* --- סוף סקריפט זמני - זכור למחוק קוד זה בסיום השיפוצים --- */
 </body>
 </html>
