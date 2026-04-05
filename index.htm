@@ -258,6 +258,8 @@ mark.hl.cur{background:#ff9800;outline:2px solid #ff9800;border-radius:2px}
 #pipInline .pip-ch-name{font-size:.88rem;opacity:.75;margin-bottom:16px;min-height:20px}
 #pipInline .pip-msg{background:rgba(255,255,255,.15);border-radius:10px;padding:12px 16px;font-size:.84rem;line-height:1.7;margin-bottom:14px;min-height:48px}
 #pipInline .pip-msg.pip-err{background:rgba(255,77,109,.25);border:1px solid rgba(255,77,109,.4)}
+#pipInline .pip-msg.pip-success{background:rgba(29,233,139,.25);border:1px solid rgba(29,233,139,.5);animation:pipFlashGreen 0.7s ease-in-out 3;}
+@keyframes pipFlashGreen{0%,100%{background:rgba(29,233,139,.15)}50%{background:rgba(29,233,139,.45)}}
 #pipInline .pip-batch{display:flex;align-items:center;gap:8px;margin-bottom:14px}
 #pipInline .pip-batch-lbl{font-size:.72rem;font-weight:800;opacity:.7;text-transform:uppercase;letter-spacing:.06em}
 #pipInline .pbtn{width:32px;height:32px;border-radius:7px;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);
@@ -384,7 +386,7 @@ mark.hl.cur{background:#ff9800;outline:2px solid #ff9800;border-radius:2px}
   <div id="pipInline" style="display:none">
     <div class="pip-title-bar">
       <span class="pip-book-title" id="piTitle">BookGenius</span>
-      <span class="pip-step-badge" id="piStep">שלב 0 מתוך 0</span>
+      <span class="pip-step-badge" id="piStep">מבוא ופרטי ספר</span>
     </div>
     <div class="pip-ch-name" id="piChName"></div>
     <div class="pip-msg" id="piMsg">מתחיל...</div>
@@ -842,21 +844,42 @@ function pipChName(){
   return chs.length===1?(chs[0].chapter_number===0?'מבוא':chs[0].title):chs.map(c=>c.title).join(' · ');
 }
 
-function pipUpdateContent(msg,isErr=false){
+function pipStepLabel(){
+  if(_curPhase==='toc')return 'מבוא ופרטי ספר';
+  if(!S.toc)return 'מבוא ופרטי ספר';
+  const all=S.toc.chapters.slice().sort((a,b)=>a.chapter_number-b.chapter_number);
+  const total=all.length;
+  if(S.curBatch&&S.curBatch.length){
+    const nums=S.curBatch.filter(n=>n!==0);
+    const hasIntro=S.curBatch.includes(0);
+    if(S.curBatch.length===1){
+      const n=S.curBatch[0];
+      const label=n===0?'מבוא':`פרק ${n}`;
+      return `${label} מתוך ${total}`;
+    }
+    const first=S.curBatch[0]===0?'מבוא':`פרק ${S.curBatch[0]}`;
+    const last=`פרק ${S.curBatch[S.curBatch.length-1]}`;
+    return `פרקים ${first}–${last} מתוך ${total}`;
+  }
+  return `פרק מתוך ${total}`;
+}
+
+function pipUpdateContent(msg,isErr=false,isSuccess=false){
   const setEl=(id,html,isHtml=false)=>{const el=document.getElementById(id);if(el){if(isHtml)el.innerHTML=html;else el.textContent=html;}};
   const title=pipBookTitle();
-  const cur=pipCurrentStep(),tot=pipTotalStepsAll();
-  setEl('piTitle',title);setEl('piStep',`שלב ${cur} מתוך ${tot}`);
+  const stepLabel=pipStepLabel();
+  setEl('piTitle',title);setEl('piStep',stepLabel);
   setEl('piChName',pipChName());
+  const cls='pip-msg'+(isErr?' pip-err':isSuccess?' pip-success':'');
   const msgEl=document.getElementById('piMsg');
-  if(msgEl){msgEl.textContent=msg;msgEl.className='pip-msg'+(isErr?' pip-err':'');}
+  if(msgEl){msgEl.textContent=msg;msgEl.className=cls;}
   // PiP window
   if(_pipDoc){
     try{
       const titleEl=_pipDoc.getElementById('piTitle');if(titleEl)titleEl.textContent=title;
-      const stepEl=_pipDoc.getElementById('piStep');if(stepEl)stepEl.textContent=`שלב ${cur} מתוך ${tot}`;
+      const stepEl=_pipDoc.getElementById('piStep');if(stepEl)stepEl.textContent=stepLabel;
       const chEl=_pipDoc.getElementById('piChName');if(chEl)chEl.textContent=pipChName();
-      const mEl=_pipDoc.getElementById('piMsg');if(mEl){mEl.textContent=msg;mEl.className='pip-msg'+(isErr?' pip-err':'');}
+      const mEl=_pipDoc.getElementById('piMsg');if(mEl){mEl.textContent=msg;mEl.className=cls;}
     }catch(e){}
   }
 }
@@ -892,23 +915,37 @@ async function pipCopyAgain(){
 
 async function pipPasteAndProcess(){
   let text='';
-  // Try modern clipboard API (works on HTTPS/localhost with permission)
-  try{text=await navigator.clipboard.readText();}catch(e){text='';}
+  let readFailed=false;
+  try{text=await navigator.clipboard.readText();}catch(e){readFailed=true;}
 
-  if(!text.trim()){
-    // Either clipboard is empty or permission denied — show manual textarea
-    // Use _pipDoc when real PiP window is open, else main document
-    const doc=(_pipDoc&&!_pipDoc.defaultView?.closed)?_pipDoc:document;
-    const mw=doc.getElementById('pipManualWrap');
-    const ta=doc.getElementById('pipManualTA');
-    if(mw&&ta){mw.style.display='block';try{ta.focus();}catch(e){}}
-    // Also ensure inline fallback is visible if no PiP window
-    if(!_pipWin&&!_pipDoc){const il=$('pipInline');if(il)il.style.display='block';}
-    pipUpdateContent('הדבק את תשובת ה-LLM בתיבה למטה (Ctrl+V).',false);
+  if(!readFailed){
+    // readText() succeeded — use whatever is in the clipboard
+    if(text.trim()){
+      if(_curPhase==='toc')await _processTOCPaste(text);
+      else await _processChapterPaste(text);
+    } else {
+      // Permission OK but clipboard is empty — ask user to copy the LLM response first
+      pipUpdateContent('⚠️ הלוח ריק — העתק את תשובת ה-LLM ולחץ שוב.',false);
+    }
     return;
   }
-  if(_curPhase==='toc')await _processTOCPaste(text);
-  else await _processChapterPaste(text);
+
+  // readText() threw (permission denied / unavailable) — show manual textarea
+  const doc=(_pipDoc&&!_pipDoc.defaultView?.closed)?_pipDoc:document;
+  const mw=doc.getElementById('pipManualWrap');
+  const ta=doc.getElementById('pipManualTA');
+  if(mw&&ta){
+    mw.style.display='block';
+    if(!ta._pasteListenerAttached){
+      ta._pasteListenerAttached=true;
+      ta.addEventListener('paste',()=>{
+        setTimeout(()=>{if(ta.value.trim())pipManualSubmit();},50);
+      });
+    }
+    try{ta.focus();}catch(e){}
+  }
+  if(!_pipWin&&!_pipDoc){const il=$('pipInline');if(il)il.style.display='block';}
+  pipUpdateContent('הדבק את תשובת ה-LLM בתיבה למטה (Ctrl+V) — יאושר אוטומטית.',false);
 }
 
 async function _processTOCPaste(raw){
@@ -968,8 +1005,8 @@ async function _processChapterPaste(raw){
     }
     S.curBatch=[];
     renderRecs();updateProgress();save();
-    // Flash "נשמר בהצלחה" for 1 second
-    pipUpdateContent('הפרק נשמר בהצלחה ✓');
+    // Flash green "נשמר בהצלחה"
+    pipUpdateContent('✓ הפרק נשמר בהצלחה',false,true);
     toast('פרק נשמר בהצלחה','ok',2000);
     await new Promise(r=>setTimeout(r,1000));
     const all=S.toc.chapters.slice().sort((a,b)=>a.chapter_number-b.chapter_number);
@@ -1002,8 +1039,8 @@ function _advanceToNextChapter(){
 
 async function _finishAll(){
   _partialMode=false;
-  const doneMsg='הספר נכתב בהצלחה, יש לחזור לכרטיסיה על מנת להציג ולשמור אותו';
-  pipUpdateContent(doneMsg);
+  const doneMsg='🎉 הספר הושלם בהצלחה! חזור לכרטיסיה להצגת הספר';
+  pipUpdateContent(doneMsg,false,true);
   // Show close button in PiP
   if(_pipDoc){
     try{
@@ -1011,8 +1048,8 @@ async function _finishAll(){
       if(ab)ab.innerHTML=`<button class="pip-action-btn primary" onclick="window.close()"><i class="fas fa-times-circle"></i> סגור חלון</button>`;
     }catch(e){}
   }
-  // Show "view book" button in main
-  const sb=$('skipToExportBtn');if(sb)sb.style.display='inline-flex';
+  // Auto-navigate to book view after brief green flash
+  setTimeout(()=>showBook(), 1500);
   save();
 }
 
@@ -1027,9 +1064,14 @@ function showBook(){
 function returnToWriting(){_partialMode=false;goStep(2);}
 
 /* ══════ PiP OPEN ══════ */
-function openPiP(){
-  // Copy prompt FIRST — synchronously, before any async call consumes the user gesture.
+async function openPiP(){
+  // 1. execCommand copy FIRST — synchronous, must happen while user gesture is live
   _copyToClipboard(_curPrompt);
+
+  // 2. Request clipboard-read permission NOW (triggers browser dialog if not yet granted).
+  //    We do this AFTER execCommand so the write gesture is already consumed safely.
+  //    The readText() call here is just to get the permission — we discard the result.
+  try{ await navigator.clipboard.readText(); }catch(e){}
 
   const pipHTML=_buildPiPHTML();
   if(window.documentPictureInPicture){
@@ -1083,6 +1125,8 @@ body{font-family:'Heebo',sans-serif;background:linear-gradient(135deg,#5b4fff,#7
 .pip-ch-name{font-size:.8rem;opacity:.75;margin-bottom:12px;min-height:18px;line-height:1.4}
 .pip-msg{background:rgba(255,255,255,.15);border-radius:10px;padding:10px 14px;font-size:.82rem;line-height:1.7;margin-bottom:12px;min-height:44px}
 .pip-msg.pip-err{background:rgba(255,77,109,.3);border:1px solid rgba(255,77,109,.5)}
+.pip-msg.pip-success{background:rgba(29,233,139,.3);border:1px solid rgba(29,233,139,.6);animation:flashG .7s ease-in-out 3;}
+@keyframes flashG{0%,100%{background:rgba(29,233,139,.15)}50%{background:rgba(29,233,139,.5)}}
 .pip-batch{display:flex;align-items:center;gap:7px;margin-bottom:12px}
 .pip-batch-lbl{font-size:.68rem;font-weight:800;opacity:.7;text-transform:uppercase;letter-spacing:.05em}
 .pbtn{width:30px;height:30px;border-radius:7px;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.25);
@@ -1097,7 +1141,7 @@ body{font-family:'Heebo',sans-serif;background:linear-gradient(135deg,#5b4fff,#7
 .pip-action-btn.primary:hover{background:#f0eeff}
 #pipActionArea{display:flex;flex-direction:column;gap:8px}
 </style></head><body>
-<div class="pip-title-bar"><span class="pip-book-title" id="piTitle">${esc(pipBookTitle())}</span><span class="pip-step-badge" id="piStep">שלב 1 מתוך ${pipTotalStepsAll()}</span></div>
+<div class="pip-title-bar"><span class="pip-book-title" id="piTitle">${esc(pipBookTitle())}</span><span class="pip-step-badge" id="piStep">${esc(pipStepLabel())}</span></div>
 <div class="pip-ch-name" id="piChName">${esc(pipChName())}</div>
 <div class="pip-msg" id="piMsg">מאתחל...</div>
 <div class="pip-batch"><span class="pip-batch-lbl">פרקים בפעם:</span>${batchBtns}</div>
