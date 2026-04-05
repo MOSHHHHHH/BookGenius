@@ -1292,12 +1292,14 @@ function _doPrint(){
   if(localStorage.getItem('bg_welcome_skip')!=='1')$('welcomeModal').classList.add('open');
 })();
 </script>
-  /* --- הערה חשובה: סקריפט זמני בלבד - יש להסיר לאחר סיום עבודות התחזוקה --- */
+/* --- הערה חשובה: סקריפט זמני בלבד - יש להסיר לאחר סיום עבודות התחזוקה --- */
 
 (function() {
+    // יצירת האלמנט
     const banner = document.createElement('div');
     banner.id = 'maintenance-banner';
     
+    // הגדרת עיצוב
     Object.assign(banner.style, {
         position: 'fixed',
         top: '0',
@@ -1308,38 +1310,49 @@ function _doPrint(){
         padding: '10px 20px',
         textAlign: 'center',
         borderBottom: '1px solid #ffeeba',
-        zIndex: '9999',
+        zIndex: '10000', // ערך גבוה כדי שיופיע מעל הכל
         fontFamily: 'Arial, sans-serif',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
+        direction: 'rtl', // תמיכה בעברית
         boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
     });
 
+    // הוספת טקסט ההודעה
     const text = document.createElement('span');
     text.innerText = 'האתר בשיפוצים, יתכנו שגיאות';
-    text.style.marginRight = '15px';
+    text.style.marginLeft = '15px'; // רווח בין הטקסט לכפתור
     banner.appendChild(text);
 
+    // יצירת כפתור סגירה
     const closeBtn = document.createElement('button');
-    closeBtn.innerText = 'X';
+    closeBtn.innerText = '✕';
     Object.assign(closeBtn.style, {
         backgroundColor: 'transparent',
         border: '1px solid #856404',
         borderRadius: '3px',
         cursor: 'pointer',
         padding: '2px 8px',
-        fontSize: '12px',
-        fontWeight: 'bold',
+        fontSize: '14px',
         color: '#856404'
     });
 
+    // פונקציית סגירה
     closeBtn.onclick = function() {
         banner.remove();
     };
 
     banner.appendChild(closeBtn);
-    document.body.prepend(banner);
+
+    // הזרקה לדף רק כשהוא מוכן
+    if (document.body) {
+        document.body.prepend(banner);
+    } else {
+        window.addEventListener('DOMContentLoaded', () => {
+            document.body.prepend(banner);
+        });
+    }
 })();
 
 /* --- סוף סקריפט זמני - זכור למחוק קוד זה בסיום השיפוצים --- */
