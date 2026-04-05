@@ -1,8 +1,6 @@
-
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
-  
 <link rel="icon" type="image/svg+xml" href="logo.svg">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -874,11 +872,12 @@ function pipSyncBatch(){
 function pipSetBatch(n){setBatch(n);}
 
 function pipManualSubmit(){
-  const ta=$('pipManualTA');
+  const doc=(_pipDoc&&!_pipDoc.defaultView?.closed)?_pipDoc:document;
+  const ta=doc.getElementById('pipManualTA');
   if(!ta)return;
   const text=ta.value.trim();
   if(!text){toast('התיבה ריקה — הדבק את תשובת ה-LLM','err',3000);return;}
-  const mw=$('pipManualWrap');if(mw)mw.style.display='none';
+  const mw=doc.getElementById('pipManualWrap');if(mw)mw.style.display='none';
   ta.value='';
   if(_curPhase==='toc')_processTOCPaste(text);
   else _processChapterPaste(text);
@@ -886,25 +885,31 @@ function pipManualSubmit(){
 
 async function pipCopyAgain(){
   if(!_curPrompt)return;
-  try{await navigator.clipboard.writeText(_curPrompt);}catch(e){
-    const ta=document.createElement('textarea');ta.value=_curPrompt;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();
-  }
+  _copyToClipboard(_curPrompt);
   pipUpdateContent('ההנחיה הועתקה שוב — הדבק אותה במודל השפה והעתק את התשובה');
   toast('הפרומפט הועתק שוב','info',2000);
 }
 
 async function pipPasteAndProcess(){
   let text='';
-  try{text=await navigator.clipboard.readText();}catch(e){
-    // Clipboard read failed — show manual paste textarea fallback
-    const mw=$('pipManualWrap');
-    if(mw){mw.style.display='block';$('pipManualTA').focus();}
-    pipUpdateContent('⚠️ גישה ללוח נדחתה — הדבק את התשובה בתיבה למטה.',true);
+  // Try modern clipboard API (works on HTTPS/localhost with permission)
+  try{text=await navigator.clipboard.readText();}catch(e){text='';}
+
+  if(!text.trim()){
+    // Either clipboard is empty or permission denied — show manual textarea
+    // Use _pipDoc when real PiP window is open, else main document
+    const doc=(_pipDoc&&!_pipDoc.defaultView?.closed)?_pipDoc:document;
+    const mw=doc.getElementById('pipManualWrap');
+    const ta=doc.getElementById('pipManualTA');
+    if(mw&&ta){mw.style.display='block';try{ta.focus();}catch(e){}}
+    // Also ensure inline fallback is visible if no PiP window
+    if(!_pipWin&&!_pipDoc){const il=$('pipInline');if(il)il.style.display='block';}
+    pipUpdateContent('הדבק את תשובת ה-LLM בתיבה למטה (Ctrl+V).',false);
     return;
   }
-  if(!text.trim()){toast('הלוח ריק — העתק את תשובת ה-LLM תחילה','err',3000);return;}
   if(_curPhase==='toc')await _processTOCPaste(text);
   else await _processChapterPaste(text);
+}
 }
 
 async function _processTOCPaste(raw){
@@ -925,7 +930,7 @@ async function _processTOCPaste(raw){
   }catch(e){
     const fix=buildFixPrompt(buildTOCPrompt(),raw,e.message);
     _curPrompt=fix;
-    try{await navigator.clipboard.writeText(fix);}catch(ce){}
+    _copyToClipboard(fix);
     pipUpdateContent('שגיאה בפיענוח ה-JSON, הנחיית תיקון נוצרה והועתקה, יש להדביק אותה במודל השפה ולהעתיק את התשובה',true);
   }
 }
@@ -939,7 +944,7 @@ async function _processChapterPaste(raw){
       const chs=S.toc.chapters.filter(c=>exp.includes(c.chapter_number));
       const fix=buildFixPrompt(buildChapterPrompt(chs),raw,pe.message);
       _curPrompt=fix;
-      try{await navigator.clipboard.writeText(fix);}catch(ce){}
+      _copyToClipboard(fix);
       pipUpdateContent('שגיאה בפיענוח ה-JSON, הנחיית תיקון נוצרה והועתקה, יש להדביק אותה במודל השפה ולהעתיק את התשובה',true);
       _processing=false;return;
     }
@@ -991,7 +996,7 @@ function _advanceToNextChapter(){
   _curPhase='chapter';
   _curPrompt=buildChapterPrompt(batch);
   // Copy to clipboard
-  navigator.clipboard.writeText(_curPrompt).catch(()=>{});
+  _copyToClipboard(_curPrompt);
   pipUpdateContent('ההנחיה הועתקה — הדבק אותה במודל השפה והעתק את התשובה');
   save();
 }
@@ -1023,33 +1028,37 @@ function showBook(){
 function returnToWriting(){_partialMode=false;goStep(2);}
 
 /* ══════ PiP OPEN ══════ */
-async function openPiP(){
-  // Request clipboard-read permission NOW, while we have a user gesture.
-  // Without this, readText() inside the PiP window fails silently because
-  // the permission prompt can't fire from within a detached PiP context.
-  try { await navigator.clipboard.readText(); } catch(e) { /* ignore — we just need the permission dialog to fire */ }
+function openPiP(){
+  // Copy prompt FIRST — synchronously, before any async call consumes the user gesture.
+  _copyToClipboard(_curPrompt);
 
-  // Build PiP HTML
   const pipHTML=_buildPiPHTML();
-  // Try document-picture-in-picture API (Chrome 116+)
   if(window.documentPictureInPicture){
-    window.documentPictureInPicture.requestWindow({width:320,height:420}).then(pipWin=>{
+    window.documentPictureInPicture.requestWindow({width:340,height:460}).then(pipWin=>{
       _pipWin=pipWin;_pipDoc=pipWin.document;
       pipWin.document.open();pipWin.document.write(pipHTML);pipWin.document.close();
-      // copy global functions into pip context
       pipWin.pipSetBatch=pipSetBatch;
       pipWin.pipCopyAgain=pipCopyAgain;
       pipWin.pipPasteAndProcess=pipPasteAndProcess;
+      pipWin.pipManualSubmit=pipManualSubmit;
       pipWin.addEventListener('pagehide',()=>{_pipWin=null;_pipDoc=null;});
-      // init content
       pipUpdateContent('ההנחיה הועתקה — הדבק אותה במודל השפה והעתק את התשובה');
-      navigator.clipboard.writeText(_curPrompt).catch(()=>{});
-    }).catch(err=>{
-      _showPiPFallback();
-    });
+    }).catch(()=>_showPiPFallback());
   } else {
     _showPiPFallback();
   }
+}
+
+/* Copy text using execCommand fallback so it works on file:// too */
+function _copyToClipboard(text){
+  if(!text)return;
+  const ta=document.createElement('textarea');
+  ta.value=text;ta.style.cssText='position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+  document.body.appendChild(ta);ta.focus();ta.select();
+  try{document.execCommand('copy');}catch(e){}
+  ta.remove();
+  // Also try modern API (works on HTTPS, may fail silently on file://)
+  navigator.clipboard.writeText(text).catch(()=>{});
 }
 
 function _showPiPFallback(){
@@ -1057,7 +1066,7 @@ function _showPiPFallback(){
   $('pipInline').style.display='block';
   pipSyncBatch();
   pipUpdateContent('ההנחיה הועתקה — הדבק אותה במודל השפה והעתק את התשובה');
-  navigator.clipboard.writeText(_curPrompt).catch(()=>{});
+  _copyToClipboard(_curPrompt);
 }
 
 function _buildPiPHTML(){
@@ -1096,6 +1105,10 @@ body{font-family:'Heebo',sans-serif;background:linear-gradient(135deg,#5b4fff,#7
 <div id="pipActionArea">
   <button class="pip-action-btn secondary" onclick="pipCopyAgain()"><i class="fas fa-copy"></i> העתק שוב</button>
   <button class="pip-action-btn primary" onclick="pipPasteAndProcess()"><i class="fas fa-clipboard-check"></i> העתקתי את התשובה</button>
+  <div id="pipManualWrap" style="display:none;margin-top:4px">
+    <textarea id="pipManualTA" rows="5" dir="ltr" placeholder="הדבק כאן את תשובת ה-LLM (Ctrl+V)..." style="width:100%;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.35);border-radius:8px;padding:8px 10px;color:#fff;font-family:monospace;font-size:.73rem;resize:vertical;outline:none;margin-bottom:6px"></textarea>
+    <button class="pip-action-btn primary" style="width:100%" onclick="pipManualSubmit()"><i class="fas fa-check"></i> אשר ועבד</button>
+  </div>
 </div>
 </body></html>`;
 }
@@ -1292,69 +1305,5 @@ function _doPrint(){
   if(localStorage.getItem('bg_welcome_skip')!=='1')$('welcomeModal').classList.add('open');
 })();
 </script>
-/* --- הערה חשובה: סקריפט זמני בלבד - יש להסיר לאחר סיום עבודות התחזוקה --- */
-
-(function() {
-    // יצירת האלמנט
-    const banner = document.createElement('div');
-    banner.id = 'maintenance-banner';
-    
-    // הגדרת עיצוב
-    Object.assign(banner.style, {
-        position: 'fixed',
-        top: '0',
-        left: '0',
-        width: '100%',
-        backgroundColor: '#fff3cd',
-        color: '#856404',
-        padding: '10px 20px',
-        textAlign: 'center',
-        borderBottom: '1px solid #ffeeba',
-        zIndex: '10000', // ערך גבוה כדי שיופיע מעל הכל
-        fontFamily: 'Arial, sans-serif',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        direction: 'rtl', // תמיכה בעברית
-        boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
-    });
-
-    // הוספת טקסט ההודעה
-    const text = document.createElement('span');
-    text.innerText = 'האתר בשיפוצים, יתכנו שגיאות';
-    text.style.marginLeft = '15px'; // רווח בין הטקסט לכפתור
-    banner.appendChild(text);
-
-    // יצירת כפתור סגירה
-    const closeBtn = document.createElement('button');
-    closeBtn.innerText = '✕';
-    Object.assign(closeBtn.style, {
-        backgroundColor: 'transparent',
-        border: '1px solid #856404',
-        borderRadius: '3px',
-        cursor: 'pointer',
-        padding: '2px 8px',
-        fontSize: '14px',
-        color: '#856404'
-    });
-
-    // פונקציית סגירה
-    closeBtn.onclick = function() {
-        banner.remove();
-    };
-
-    banner.appendChild(closeBtn);
-
-    // הזרקה לדף רק כשהוא מוכן
-    if (document.body) {
-        document.body.prepend(banner);
-    } else {
-        window.addEventListener('DOMContentLoaded', () => {
-            document.body.prepend(banner);
-        });
-    }
-})();
-
-/* --- סוף סקריפט זמני - זכור למחוק קוד זה בסיום השיפוצים --- */
 </body>
 </html>
