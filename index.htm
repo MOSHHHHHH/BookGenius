@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
@@ -335,14 +336,6 @@ mark.hl.cur{background:#ff9800;outline:2px solid #ff9800;border-radius:2px}
   <div class="field"><label>פרטי הספר — על מה הספר? קהל יעד? מטרה? *</label><textarea id="s1_desc" rows="3" placeholder="תאר את הספר בקצרה..."></textarea></div>
   <div class="field"><label>מידע נוסף / הנחיות כתיבה (רשות)</label><textarea id="s1_extra" rows="2" placeholder="סגנון, טון, רמת פירוט, הנחיות מיוחדות..."></textarea></div>
 
-  <div class="info-card">
-    <span class="ic-icon">✨</span>
-    <div>
-      <p style="font-size:.9rem;font-weight:700;color:var(--text)">כישורים <span style="color:var(--primary)">אוטומטיים!</span></p>
-      <p style="font-size:.76rem;color:var(--muted);margin-top:3px">ה-AI יחליט בעצמו אילו כישורים (שחמט, תווים, קוד, מתמטיקה) נחוצים לספר זה</p>
-    </div>
-  </div>
-
   <div style="display:flex;align-items:center;flex-wrap:wrap;gap:14px;padding:14px 18px;background:#f8f9ff;border-radius:12px;border:1.5px solid var(--border)">
     <span style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);white-space:nowrap">פרקים בפעם:</span>
     <div style="display:flex;gap:6px">
@@ -406,6 +399,11 @@ mark.hl.cur{background:#ff9800;outline:2px solid #ff9800;border-radius:2px}
     <div class="pip-actions">
       <button class="pip-action-btn secondary" onclick="pipCopyAgain()"><i class="fas fa-copy"></i> העתק שוב</button>
       <button class="pip-action-btn primary" onclick="pipPasteAndProcess()"><i class="fas fa-clipboard-check"></i> העתקתי את התשובה</button>
+    </div>
+    <div id="pipManualWrap" style="display:none;margin-top:10px">
+      <textarea id="pipManualTA" rows="4" placeholder="הדבק כאן את תשובת ה-LLM (Ctrl+V)..." dir="ltr"
+        style="width:100%;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.3);border-radius:8px;padding:8px 10px;color:#fff;font-family:monospace;font-size:.75rem;resize:vertical;outline:none"></textarea>
+      <button class="pip-action-btn primary" style="margin-top:6px;width:100%" onclick="pipManualSubmit()"><i class="fas fa-check"></i> אשר ועבד</button>
     </div>
   </div>
 
@@ -874,6 +872,17 @@ function pipSyncBatch(){
 }
 function pipSetBatch(n){setBatch(n);}
 
+function pipManualSubmit(){
+  const ta=$('pipManualTA');
+  if(!ta)return;
+  const text=ta.value.trim();
+  if(!text){toast('התיבה ריקה — הדבק את תשובת ה-LLM','err',3000);return;}
+  const mw=$('pipManualWrap');if(mw)mw.style.display='none';
+  ta.value='';
+  if(_curPhase==='toc')_processTOCPaste(text);
+  else _processChapterPaste(text);
+}
+
 async function pipCopyAgain(){
   if(!_curPrompt)return;
   try{await navigator.clipboard.writeText(_curPrompt);}catch(e){
@@ -886,7 +895,11 @@ async function pipCopyAgain(){
 async function pipPasteAndProcess(){
   let text='';
   try{text=await navigator.clipboard.readText();}catch(e){
-    toast('לא ניתן לקרוא מהלוח — נסה שוב','err',3000);return;
+    // Clipboard read failed — show manual paste textarea fallback
+    const mw=$('pipManualWrap');
+    if(mw){mw.style.display='block';$('pipManualTA').focus();}
+    pipUpdateContent('⚠️ גישה ללוח נדחתה — הדבק את התשובה בתיבה למטה.',true);
+    return;
   }
   if(!text.trim()){toast('הלוח ריק — העתק את תשובת ה-LLM תחילה','err',3000);return;}
   if(_curPhase==='toc')await _processTOCPaste(text);
@@ -1009,7 +1022,12 @@ function showBook(){
 function returnToWriting(){_partialMode=false;goStep(2);}
 
 /* ══════ PiP OPEN ══════ */
-function openPiP(){
+async function openPiP(){
+  // Request clipboard-read permission NOW, while we have a user gesture.
+  // Without this, readText() inside the PiP window fails silently because
+  // the permission prompt can't fire from within a detached PiP context.
+  try { await navigator.clipboard.readText(); } catch(e) { /* ignore — we just need the permission dialog to fire */ }
+
   // Build PiP HTML
   const pipHTML=_buildPiPHTML();
   // Try document-picture-in-picture API (Chrome 116+)
