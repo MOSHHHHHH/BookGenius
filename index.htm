@@ -756,8 +756,8 @@ function chapterSchema(chNums){
 
 /* ── PROMPT BUILDERS ── */
 function buildTOCPrompt(){
-  const b=S.book,intro=b.intro?', plus an introduction chapter (chapter number 0)':'',extra=b.extra?'\n'+b.extra:'';
-  return `You are a professional book writer. You are now talking to an API, so be sure to write exactly as I have instructed.\nWrite me book details and a table of contents for a book on "${b.title}". ${b.desc}, the book will have ${b.chapters} chapters${intro}.${extra}\nWrite it in Hebrew, in JSON format only, following the schema below. Output nothing except the JSON object. Unless otherwise requested in the details, write the book in great detail, without sparing words, in Hebrew and in professional but fluent language.\n\n${tocSchema()}`;
+  const b=S.book,intro=b.intro?', plus an introduction chapter (chapter number 0)':'';
+  return `You are a professional book writer. You are now talking to an API, so make sure to write exactly as I instructed.\nWrite me book details and a table of contents for a book as the user requested.\nWrite it in JSON format only, as agreed below. Output nothing but a JSON object. If the user specifically requests it, the book should be written in great detail, without sparing words, in Hebrew and in professional but fluent language. The specific user request within the tags always overrides the length, style and language requirement, but never the format limitations.\nUser Request: Subject: ${b.title} Details: ${b.desc} Number of chapters: ${b.chapters}${intro}${b.extra?' Additional Instructions: '+b.extra:' Additional Instructions: None'} End of User Instructions.\n\n${tocSchema()}`;
 }
 function buildChapterPrompt(chs){
   if(!Array.isArray(chs))chs=[chs];
@@ -768,10 +768,11 @@ function buildChapterPrompt(chs){
   if(hasSkill('code'))skills+='\n- Code (optional): use "code" block when a concrete example aids understanding.';
   if(hasSkill('math'))skills+='\n- Math (optional): use "math" block with LaTeX string.';
   const codeWarn=hasSkill('code')?'\n⚠️ CRITICAL — CODE FIELD ESCAPING: use \\n for line breaks, \\\\ for backslashes, \\" for quotes — NO literal line breaks in code field.\n':'';
-  const chapsToWrite=isM?`\nWrite ALL ${chs.length} chapters below IN THE SAME JSON RESPONSE.\n${chs.map(c=>`  - Chapter ${c.chapter_number}: "${c.title}" — ${c.description}`).join('\n')}\n`:'';
-  const chDesc=isM?`chapters ${chNums.join(', ')}: "${chs.map(c=>c.title).join('", "')}"`:
-    `chapter number ${chs[0].chapter_number} — "${chs[0].title}"`;
-  return `You are a professional book writer. You are now talking to an API, so be sure to write exactly as I have instructed you.\nWrite me ${chDesc} from the book "${b.title}". ${b.desc}${b.extra?', '+b.extra:''}.${chapsToWrite}\nWrite it in Hebrew, in JSON format only, following the schema below. Output nothing except the JSON object. Unless otherwise requested, write in great detail, without sparing words. Each chapter must be at least 1500 words of actual content.\n${codeWarn}${chapterSchema(chNums)}\n\nFor context, here are all the chapters:\n${JSON.stringify(S.toc,null,2)}\n${skills?'\nOptional visual blocks — use only where they genuinely improve understanding:'+skills:''}`;
+  const chList=isM
+    ?chs.map(c=>`Chapter ${c.chapter_number} - ${c.title}: ${c.description}`).join('\n')
+    :`${chs[0].chapter_number} - ${chs[0].title}: ${chs[0].description}`;
+  const chHeader=isM?`chapters number ${chNums.join(', ')}`:`chapter number ${chs[0].chapter_number} - ${chs[0].title}`;
+  return `You are a professional book writer. You are now talking to an API, so make sure you write exactly as I instructed you.\nWrite me ${chHeader} for book "${b.title}" - ${b.desc} as requested by the user.\n${isM?`Chapters to write:\n${chList}\n`:''}\nWrite this in JSON format only, per the agreement below. Output nothing but a JSON object. If the user specifically requests it, the book should be written in great detail, without sparing words, in Hebrew and in professional but fluent language. The specific user request within the tags always overrides the length, style and language requirement, but never the format limitations.\nOriginal user request: subject: ${b.title}, details: ${b.desc}${b.extra?', additional instructions: '+b.extra:', additional instructions: None'}.\n${codeWarn}${chapterSchema(chNums)}\n\nFor context, here are all the chapters:\n${JSON.stringify(S.toc,null,2)}\n${skills?'\nOptional visual blocks — use only where they genuinely improve understanding:'+skills:''}`;
 }
 
 /* ── RECOMMENDATIONS ── */
@@ -845,20 +846,20 @@ function pipChName(){
 }
 
 function pipStepLabel(){
+  // Hide label when book is fully done
+  if(S.toc&&Object.keys(S.done).length===S.toc.chapters.length)return '';
   if(_curPhase==='toc')return 'מבוא ופרטי ספר';
   if(!S.toc)return 'מבוא ופרטי ספר';
-  const all=S.toc.chapters.slice().sort((a,b)=>a.chapter_number-b.chapter_number);
-  const total=all.length;
+  const total=S.toc.chapters.length;
   if(S.curBatch&&S.curBatch.length){
-    const nums=S.curBatch.filter(n=>n!==0);
-    const hasIntro=S.curBatch.includes(0);
     if(S.curBatch.length===1){
       const n=S.curBatch[0];
-      const label=n===0?'מבוא':`פרק ${n}`;
-      return `${label} מתוך ${total}`;
+      return (n===0?'מבוא':`פרק ${n}`)+` מתוך ${total}`;
     }
-    const first=S.curBatch[0]===0?'מבוא':`פרק ${S.curBatch[0]}`;
-    const last=`פרק ${S.curBatch[S.curBatch.length-1]}`;
+    // Multiple chapters in batch — show first and last
+    const sorted=[...S.curBatch].sort((a,b)=>a-b);
+    const first=sorted[0]===0?'מבוא':`פרק ${sorted[0]}`;
+    const last=`פרק ${sorted[sorted.length-1]}`;
     return `פרקים ${first}–${last} מתוך ${total}`;
   }
   return `פרק מתוך ${total}`;
@@ -913,14 +914,37 @@ async function pipCopyAgain(){
   toast('הפרומפט הועתק שוב','info',2000);
 }
 
+/* Detect if user accidentally pasted the prompt instead of the LLM response */
+function _looksLikePrompt(text){
+  if(!text||!_curPrompt)return false;
+  // If pasted text matches 60%+ of _curPrompt first 300 chars it's likely the prompt
+  const pHead=_curPrompt.slice(0,300).toLowerCase();
+  const tHead=text.slice(0,300).toLowerCase();
+  // Direct substring match on first 120 chars is a strong signal
+  if(pHead.length>80&&tHead.includes(pHead.slice(0,120)))return true;
+  // Also catch if it starts with our known prompt openers
+  const starters=['you are a professional book writer','write me book details','write me chapter'];
+  return starters.some(s=>tHead.trimStart().startsWith(s));
+}
+
 async function pipPasteAndProcess(){
   let text='';
   let readFailed=false;
-  try{text=await navigator.clipboard.readText();}catch(e){readFailed=true;}
+  try{
+    // Use the PiP window's navigator when it's open — that window has focus,
+    // so the browser allows clipboard read. The main window is "in background".
+    const activeNavigator=(_pipWin&&!_pipWin.closed)?_pipWin.navigator:navigator;
+    text=await activeNavigator.clipboard.readText();
+  }catch(e){readFailed=true;}
 
   if(!readFailed){
     // readText() succeeded — use whatever is in the clipboard
     if(text.trim()){
+      // Guard: user may have accidentally pasted the prompt instead of the LLM response
+      if(_looksLikePrompt(text)){
+        pipUpdateContent('⚠️ נראה שהדבקת את הפרומפט במקום תשובת ה-LLM.\nהעתק את תשובת ה-LLM ולחץ שוב.',true);
+        return;
+      }
       if(_curPhase==='toc')await _processTOCPaste(text);
       else await _processChapterPaste(text);
     } else {
@@ -961,7 +985,9 @@ async function _processTOCPaste(raw){
       saveRecs(data.book_recommendations);
     S.done={};
     updateHeader();updateProgress();
-    // Move to first chapter batch
+    // Flash green success before advancing to first chapter
+    pipUpdateContent(`✓ תוכן העניינים התקבל! "${data.book_title||S.book.title}" — ${data.chapters.length} פרקים`,false,true);
+    await new Promise(r=>setTimeout(r,1200));
     _advanceToNextChapter();
   }catch(e){
     const fix=buildFixPrompt(buildTOCPrompt(),raw,e.message);
