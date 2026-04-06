@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
@@ -221,6 +222,14 @@ mark.hl.cur{background:#ff9800;outline:2px solid #ff9800;border-radius:2px}
   border:1.5px solid var(--primary);color:var(--primary);background:var(--primary-dim);
   font-family:'Heebo',sans-serif;font-size:.8rem;font-weight:700;cursor:pointer;transition:all .2s;}
 .rec-btn:hover{background:var(--primary);color:#fff;transform:translateY(-1px)}
+/* LLM links shown after PiP opens */
+.llm-links{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px}
+.llm-link{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:50px;
+  background:#fff;border:1.5px solid var(--border);color:var(--text);font-size:.8rem;font-weight:700;
+  text-decoration:none;transition:all .2s;font-family:'Heebo',sans-serif;}
+.llm-link:hover{border-color:var(--primary);color:var(--primary);box-shadow:0 2px 8px rgba(91,79,255,.15);transform:translateY(-1px)}
+.llm-link img{width:16px;height:16px;border-radius:3px;flex-shrink:0;object-fit:contain}
+.llm-links-label{font-size:.72rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
 /* PRINT */
 .print-step{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-radius:10px;background:#f8f9ff;border:1.5px solid var(--border);}
 .print-step-num{width:24px;height:24px;border-radius:50%;background:var(--primary-dim);border:1.5px solid rgba(91,79,255,.4);
@@ -377,9 +386,15 @@ mark.hl.cur{background:#ff9800;outline:2px solid #ff9800;border-radius:2px}
         <span style="color:var(--muted);font-size:.8rem">לתשומת לב: הכלי מותאם לדפדפן <strong>Chrome</strong> במערכת <strong>Windows</strong> בלבד.</span>
       </p>
     </div>
-    <button onclick="openPiP()" class="btn btn-primary" style="align-self:flex-start;gap:9px">
-      <i class="fas fa-clone"></i> פתח חלון PiP
-    </button>
+    <div id="pipBtnWrap" style="display:flex;align-items:center;flex-wrap:wrap;gap:10px">
+      <button id="pipOpenBtn" onclick="openPiP()" class="btn btn-primary" style="align-self:flex-start;gap:9px">
+        <i class="fas fa-clone"></i> פתח חלון PiP
+      </button>
+    </div>
+    <div id="llmLinksWrap" style="display:none;flex-direction:column;gap:6px">
+      <span class="llm-links-label">פתח מודל שפה:</span>
+      <div class="llm-links" id="llmLinksRow"></div>
+    </div>
   </div>
 
   <!-- PiP fallback inline (shown on error) -->
@@ -1063,15 +1078,27 @@ function _advanceToNextChapter(){
   save();
 }
 
+function pipReturnToTab(){
+  // Close PiP window and focus the main tab
+  if(_pipWin&&!_pipWin.closed){
+    try{_pipWin.close();}catch(e){}
+  }
+  _pipWin=null;_pipDoc=null;
+  _hideLLMLinks();
+  // Bring main window into focus
+  try{window.focus();}catch(e){}
+  showBook();
+}
+
 async function _finishAll(){
   _partialMode=false;
   const doneMsg='🎉 הספר הושלם בהצלחה! חזור לכרטיסיה להצגת הספר';
   pipUpdateContent(doneMsg,false,true);
-  // Show close button in PiP
+  // Replace PiP actions with "חזור לכרטיסיה" button
   if(_pipDoc){
     try{
       const ab=_pipDoc.getElementById('pipActionArea');
-      if(ab)ab.innerHTML=`<button class="pip-action-btn primary" onclick="window.close()"><i class="fas fa-times-circle"></i> סגור חלון</button>`;
+      if(ab)ab.innerHTML=`<button class="pip-action-btn primary" onclick="pipReturnToTab()"><i class="fas fa-arrow-right"></i> חזור לכרטיסיה</button>`;
     }catch(e){}
   }
   // Auto-navigate to book view after brief green flash
@@ -1090,13 +1117,39 @@ function showBook(){
 function returnToWriting(){_partialMode=false;goStep(2);}
 
 /* ══════ PiP OPEN ══════ */
+const LLM_MODELS=[
+  {name:'ChatGPT',  link:'https://chatgpt.com'},
+  {name:'Gemini',   link:'https://gemini.google.com'},
+  {name:'Claude',   link:'https://claude.ai'},
+  {name:'Grok',     link:'https://grok.com'},
+];
+const FAVICON='https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=';
+
+function _showLLMLinks(){
+  const wrap=$('llmLinksWrap'), row=$('llmLinksRow'), btn=$('pipBtnWrap');
+  if(!wrap||!row)return;
+  if(!row.children.length){
+    row.innerHTML=LLM_MODELS.map(m=>
+      `<a class="llm-link" href="${m.link}" target="_blank" rel="noopener">
+        <img src="${FAVICON}${m.link}&size=64" alt="${m.name}" onerror="this.style.display='none'">
+        ${m.name}
+      </a>`).join('');
+  }
+  if(btn)btn.style.display='none';
+  wrap.style.display='flex';
+}
+
+function _hideLLMLinks(){
+  const wrap=$('llmLinksWrap'), btn=$('pipBtnWrap');
+  if(wrap)wrap.style.display='none';
+  if(btn)btn.style.display='flex';
+}
+
 async function openPiP(){
   // 1. execCommand copy FIRST — synchronous, must happen while user gesture is live
   _copyToClipboard(_curPrompt);
 
   // 2. Request clipboard-read permission NOW (triggers browser dialog if not yet granted).
-  //    We do this AFTER execCommand so the write gesture is already consumed safely.
-  //    The readText() call here is just to get the permission — we discard the result.
   try{ await navigator.clipboard.readText(); }catch(e){}
 
   const pipHTML=_buildPiPHTML();
@@ -1108,7 +1161,13 @@ async function openPiP(){
       pipWin.pipCopyAgain=pipCopyAgain;
       pipWin.pipPasteAndProcess=pipPasteAndProcess;
       pipWin.pipManualSubmit=pipManualSubmit;
-      pipWin.addEventListener('pagehide',()=>{_pipWin=null;_pipDoc=null;});
+      pipWin.pipReturnToTab=pipReturnToTab;
+      pipWin.addEventListener('pagehide',()=>{
+        _pipWin=null;_pipDoc=null;
+        // Restore PiP button, hide LLM links — data is intact
+        _hideLLMLinks();
+      });
+      _showLLMLinks();
       pipUpdateContent('ההנחיה הועתקה — הדבק אותה במודל השפה והעתק את התשובה');
     }).catch(()=>_showPiPFallback());
   } else {
