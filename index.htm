@@ -672,11 +672,11 @@ mark.hl.cur{background:#ff9800;outline:2px solid #ff9800;border-radius:2px}
         </div>
       </div>
       <div class="setting-row">
-        <div><div class="setting-label">הערות, אזהרות, טיפים (Callout)</div></div>
+        <div><div class="setting-label">הערות, אזהרות, טיפים</div></div>
         <label class="toggle-sw"><input type="checkbox" id="bs_callouts" onchange="saveBS()"><span class="toggle-track"></span></label>
       </div>
       <div class="setting-row">
-        <div><div class="setting-label">ציטוטים (Blockquote)</div></div>
+        <div><div class="setting-label">ציטוטים</div></div>
         <label class="toggle-sw"><input type="checkbox" id="bs_blockquotes" onchange="saveBS()"><span class="toggle-track"></span></label>
       </div>
       <div class="setting-row">
@@ -698,7 +698,6 @@ mark.hl.cur{background:#ff9800;outline:2px solid #ff9800;border-radius:2px}
           <label class="skill-toggle"><input type="checkbox" id="bs_math" onchange="saveBS()"><span>∑ מתמטיקה</span></label>
         </div>
       </div>
-      <p style="font-size:.73rem;color:var(--muted);margin-top:10px;line-height:1.6">שינויים אלו משפיעים על הפרומפט הנשלח ל-LLM בלבד ולא על פיענוח התשובה. ההגדרות נשמרות באופן מקומי בלבד.</p>
     </div>
   </div>
   <div class="modal-footer">
@@ -1216,6 +1215,15 @@ function step1Submit(){
 }
 
 /* ══════ PiP SYSTEM ══════ */
+function pipInit(){
+  // Reset inline PiP display state when entering step 2
+  const il=$('pipInline');
+  if(il)il.style.display='none';
+  const mw=$('pipManualWrap');
+  if(mw)mw.style.display='none';
+  pipSyncBatch();
+  pipUpdateContent('ההנחיה הועתקה — פתח חלון PiP ולאחר מכן הדבק אותה במודל השפה');
+}
 function pipTotalSteps(){
   if(!S.toc)return 1;
   const all=S.toc.chapters.slice().sort((a,b)=>a.chapter_number-b.chapter_number);
