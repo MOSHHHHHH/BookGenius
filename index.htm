@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
@@ -1988,7 +1989,11 @@ function sanitizeFileName(s){
   return (s||'').replace(/[\\/:*?"<>|]/g,'_').replace(/\s+/g,' ').trim();
 }
 
-/* ── tiny IndexedDB helper (scratch storage during export) ── */
+/* ── tiny IndexedDB helper (scratch storage during export) ──
+   Every call opens a fresh connection and the caller is responsible for
+   closing it (imgExpCloseDb) once done - this avoids ever reusing a
+   connection the browser may have started closing behind our back
+   (e.g. after the tab was suspended/backgrounded for a long time). */
 function imgExpDB(){
   return new Promise((resolve,reject)=>{
     const req = indexedDB.open('bg_img_export', 1);
@@ -1997,20 +2002,27 @@ function imgExpDB(){
     req.onerror = ()=>reject(req.error);
   });
 }
+function imgExpCloseDb(db){
+  try{ if(db) db.close(); }catch(e){ /* already closed/closing - fine */ }
+}
 function imgExpPut(db,key,blob){
   return new Promise((resolve,reject)=>{
-    const tx=db.transaction('pages','readwrite');
-    tx.objectStore('pages').put(blob,key);
-    tx.oncomplete=()=>resolve();
-    tx.onerror=()=>reject(tx.error);
+    try{
+      const tx=db.transaction('pages','readwrite');
+      tx.objectStore('pages').put(blob,key);
+      tx.oncomplete=()=>resolve();
+      tx.onerror=()=>reject(tx.error);
+    }catch(e){ reject(e); }
   });
 }
 function imgExpGet(db,key){
   return new Promise((resolve,reject)=>{
-    const tx=db.transaction('pages','readonly');
-    const rq=tx.objectStore('pages').get(key);
-    rq.onsuccess=()=>resolve(rq.result);
-    rq.onerror=()=>reject(rq.error);
+    try{
+      const tx=db.transaction('pages','readonly');
+      const rq=tx.objectStore('pages').get(key);
+      rq.onsuccess=()=>resolve(rq.result);
+      rq.onerror=()=>reject(rq.error);
+    }catch(e){ reject(e); }
   });
 }
 function imgExpClear(db){
@@ -2020,8 +2032,30 @@ function imgExpClear(db){
       tx.objectStore('pages').clear();
       tx.oncomplete=()=>resolve();
       tx.onerror=()=>resolve();
-    }catch(e){resolve();}
+    }catch(e){resolve();} // a connection that's already closing just means there's nothing left to clear
   });
+}
+// Puts a page's PNG in IndexedDB; if the connection turns out to be mid-close
+// (e.g. the browser silently closed it while the tab was asleep/backgrounded),
+// transparently opens a fresh connection and retries once before giving up.
+async function imgExpPutResilient(dbHolder, key, blob){
+  try{
+    await imgExpPut(dbHolder.db, key, blob);
+  }catch(err){
+    imgExpCloseDb(dbHolder.db);
+    dbHolder.db = await imgExpDB();
+    await imgExpPut(dbHolder.db, key, blob);
+  }
+}
+// Races a promise against a timeout so a hung render/DB call (device sleep,
+// a stuck tab, a library that silently never resolves) fails loudly instead
+// of leaving the export stuck forever with no feedback.
+function withTimeout(promise, ms, label){
+  let timer;
+  const timeout = new Promise((_,reject)=>{
+    timer = setTimeout(()=>reject(new Error(`הפעולה "${label}" ארכה יותר מדי זמן ובוטלה`)), ms);
+  });
+  return Promise.race([Promise.resolve(promise), timeout]).finally(()=>clearTimeout(timer));
 }
 
 /* ── lazy-load the (large) rendering/zipping libraries only once the user actually clicks "הורד כתמונות" ── */
@@ -2052,7 +2086,10 @@ let _imgExp = { phase:'idle', page:0, total:0, zipBlob:null, zipName:'', readyAt
 function resetImgExpState(){
   _imgExp.phase='idle'; _imgExp.page=0; _imgExp.total=0;
   _imgExp.zipBlob=null; _imgExp.zipName=''; _imgExp.readyAt=0;
-  imgExpDB().then(db=>imgExpClear(db)).catch(()=>{});
+  // Best-effort cleanup of leftover scratch data - failure here must never
+  // block the button from being usable again, which is why the state above
+  // is already reset synchronously regardless of how this turns out.
+  imgExpDB().then(db=>imgExpClear(db).finally(()=>imgExpCloseDb(db))).catch(()=>{});
 }
 
 function triggerZipDownload(){
@@ -2290,6 +2327,9 @@ function buildImageExportPages(){
   return {pageEls, stage};
 }
 
+const IMG_PAGE_TIMEOUT_MS = 45000;  // a single page render+store should never take this long
+const IMG_DB_OP_TIMEOUT_MS = 15000; // nor should a single small IndexedDB read/write
+
 async function downloadImages(){
   // Already have a finished zip cached in memory → clicking again just re-downloads it.
   if(_imgExp.phase==='ready'){ triggerZipDownload(); return; }
@@ -2298,11 +2338,12 @@ async function downloadImages(){
   if(!S.toc || !Object.keys(S.done).length){ toast('אין עדיין תוכן לספר','err'); return; }
 
   _imgExp.phase='libs';
-  let stage=null, db=null;
+  let stage=null;
+  const dbHolder = { db:null }; // boxed so a retry can swap in a fresh connection mid-loop
   try{
     await ensureImgExportLibs(); // only fetched here, on first click - never on page load
-    db = await imgExpDB();
-    await imgExpClear(db);
+    dbHolder.db = await imgExpDB();
+    await imgExpClear(dbHolder.db);
     const built = buildImageExportPages();
     stage = built.stage;
     const pages = built.pageEls;
@@ -2313,12 +2354,14 @@ async function downloadImages(){
     _imgExp.phase='rendering'; _imgExp.total=total;
     for(let i=0;i<total;i++){
       _imgExp.page = i+1;
-      const canvas = await html2canvas(pages[i], {
-        scale: IMG_SCALE, backgroundColor:'#ffffff', useCORS:true, logging:false,
-        width: IMG_PAGE_W, height: IMG_PAGE_H
-      });
-      const blob = await new Promise(res=>canvas.toBlob(res,'image/png'));
-      if(blob) await imgExpPut(db, i, blob);
+      await withTimeout((async()=>{
+        const canvas = await html2canvas(pages[i], {
+          scale: IMG_SCALE, backgroundColor:'#ffffff', useCORS:true, logging:false,
+          width: IMG_PAGE_W, height: IMG_PAGE_H
+        });
+        const blob = await new Promise(res=>canvas.toBlob(res,'image/png'));
+        if(blob) await imgExpPutResilient(dbHolder, i, blob);
+      })(), IMG_PAGE_TIMEOUT_MS, `הכנת תמונה ${i+1}`);
       pages[i].remove();
       // Yield back to the browser between pages so old/weak devices stay responsive.
       await new Promise(r=>setTimeout(r, 30));
@@ -2328,14 +2371,14 @@ async function downloadImages(){
     const zip = new JSZip();
     const digits = String(total).length;
     for(let i=0;i<total;i++){
-      const blob = await imgExpGet(db, i);
+      const blob = await withTimeout(imgExpGet(dbHolder.db, i), IMG_DB_OP_TIMEOUT_MS, `קריאת תמונה ${i+1}`);
       if(!blob) continue;
       const num = String(i+1).padStart(digits,'0');
       zip.file(`${num} מתוך ${total}, ${bookTitle} by BookGenius.png`, blob);
       if(i % 5 === 0) await new Promise(r=>setTimeout(r,0));
     }
     const zipBlob = await zip.generateAsync({type:'blob', compression:'STORE'});
-    await imgExpClear(db); // the per-page PNGs already made it into the zip, free the scratch store
+    await imgExpClear(dbHolder.db); // the per-page PNGs already made it into the zip, free the scratch store
 
     _imgExp.zipBlob = zipBlob;
     _imgExp.zipName = `${bookTitle} - תמונות by BookGenius.zip`;
@@ -2344,9 +2387,10 @@ async function downloadImages(){
     triggerZipDownload();
   }catch(err){
     console.error(err);
-    toast('שגיאה בייצוא התמונות: '+(err&&err.message||err),'err');
-    resetImgExpState();
+    toast('שגיאה בייצוא התמונות: '+(err&&err.message||err)+' — אפשר ללחוץ שוב כדי לנסות מחדש','err');
+    resetImgExpState(); // always returns the button to a clean, clickable "step 1" state
   }finally{
+    imgExpCloseDb(dbHolder.db);
     if(stage) stage.remove();
     document.querySelectorAll('.img-exp-scratch').forEach(el=>el.remove());
   }
