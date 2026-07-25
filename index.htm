@@ -1983,7 +1983,8 @@ window.addEventListener('load', function() {
    (the browser's long-term storage) so we never hold more than one
    rendered page in memory at once — keeps this smooth on weak devices. */
 const IMG_PAGE_W = 640, IMG_PAGE_H = 960, IMG_SCALE = 3; // 3x → 1920×2880 actual pixels per page
-const IMG_PAD = 28, IMG_GAP = 14, IMG_SAFETY = 20;
+const IMG_PAD = 28, IMG_GAP = 14, IMG_SAFETY = 28;
+const IMG_FONT_SCALE = 2; // read comfortably at native 640×960 size - at least double the editor's font sizes
 
 function sanitizeFileName(s){
   return (s||'').replace(/[\\/:*?"<>|]/g,'_').replace(/\s+/g,' ').trim();
@@ -2126,8 +2127,74 @@ function unitFootprintHeight(el){
   const cs = getComputedStyle(el);
   return r.height + (parseFloat(cs.marginTop)||0) + (parseFloat(cs.marginBottom)||0);
 }
+// Doubles (by default) every text element's font-size, converting rem/em to a fixed px
+// value so it's independent of the page's own font-size cascade. Skips SVG content,
+// which is enlarged separately (see upscaleSvgIfPresent) by resizing the whole diagram.
+function boostFontSizes(root, factor){
+  const els = [root, ...root.querySelectorAll('*')];
+  els.forEach(el=>{
+    if(el.namespaceURI && el.namespaceURI.indexOf('svg')!==-1) return;
+    if(el.closest && el.closest('svg')) return;
+    const cs = getComputedStyle(el);
+    const fs = parseFloat(cs.fontSize);
+    if(fs) el.style.fontSize = (fs*factor)+'px';
+    const lh = cs.lineHeight;
+    if(lh && lh!=='normal' && /px$/.test(lh)) el.style.lineHeight = (parseFloat(lh)*factor)+'px';
+  });
+}
+// Enlarges an embedded diagram (mermaid/chess/music notation are all rendered as SVG)
+// by resizing its width/height attributes - native scaling via viewBox, so the vector
+// content itself grows crisply instead of just the surrounding text.
+function upscaleSvgIfPresent(unitEl, factor){
+  if(factor===1) return;
+  const svg = unitEl.querySelector && unitEl.querySelector('svg');
+  if(!svg) return;
+  const w = svg.getBoundingClientRect().width || parseFloat(svg.getAttribute('width'))||0;
+  const h = svg.getBoundingClientRect().height || parseFloat(svg.getAttribute('height'))||0;
+  if(!w || !h) return;
+  if(!svg.getAttribute('viewBox')) svg.setAttribute('viewBox', `0 0 ${Math.round(w)} ${Math.round(h)}`);
+  resizeSvgTo(svg, w*factor, h*factor);
+}
+function resizeSvgTo(svg, newW, newH){
+  newW = Math.max(1, Math.round(newW));
+  newH = Math.max(1, Math.round(newH));
+  svg.setAttribute('width', newW);
+  svg.setAttribute('height', newH);
+  svg.style.width = newW+'px';
+  svg.style.height = newH+'px';
+  svg.style.maxWidth = 'none';
+  svg.style.display = 'block';
+  svg.style.margin = '0 auto';
+}
+// Shrinks a table that's wider than the page by reducing its font-size/padding
+// proportionally (a native reflow) rather than a CSS transform, which html2canvas
+// often fails to rasterize correctly (blank/garbled output).
+function shrinkTableToFit(tableWrapEl, factor){
+  const table = tableWrapEl.querySelector('table');
+  if(!table) return;
+  const baseFontPx = parseFloat(getComputedStyle(table).fontSize) || 14;
+  table.style.fontSize = Math.max(7, baseFontPx*factor) + 'px';
+  table.querySelectorAll('th,td').forEach(cell=>{
+    const cs = getComputedStyle(cell);
+    const pt=parseFloat(cs.paddingTop)||0, pb=parseFloat(cs.paddingBottom)||0;
+    const pl=parseFloat(cs.paddingLeft)||0, pr=parseFloat(cs.paddingRight)||0;
+    cell.style.padding = `${Math.max(1,pt*factor)}px ${Math.max(1,pr*factor)}px ${Math.max(1,pb*factor)}px ${Math.max(1,pl*factor)}px`;
+  });
+  table.style.width = '100%';
+  table.style.tableLayout = 'fixed';
+}
+// Shrinks a code block by reducing its font-size (again, no transform).
+function shrinkCodeToFit(codeWrapEl, factor){
+  const pre = codeWrapEl.querySelector('pre');
+  if(!pre) return;
+  const baseFontPx = parseFloat(getComputedStyle(pre).fontSize) || 13;
+  pre.style.fontSize = Math.max(7, baseFontPx*factor) + 'px';
+  pre.style.whiteSpace = 'pre-wrap';
+  pre.style.wordBreak = 'break-word';
+}
 // Wraps `target` in a sizing box that reserves the shrunk footprint after a CSS scale.
-// Returns the wrapping box (the element that should now represent this spot in the flow).
+// Kept only as a last-resort fallback for content types with no native-resize option
+// (e.g. an oversized callout/story block) - transforms are riskier under html2canvas.
 function wrapAndScale(target, factor){
   const cs = getComputedStyle(target);
   const mTop = parseFloat(cs.marginTop)||0, mBot = parseFloat(cs.marginBottom)||0;
@@ -2146,23 +2213,40 @@ function wrapAndScale(target, factor){
 // Shrinks a wide table/diagram/code block so it fits the page width without being cut off.
 function fitUnitWidth(u, availW){
   const el = u.el;
-  let target = el;
+  let kind = null;
   if(el.classList){
-    if(el.classList.contains('table-wrap')) target = el.querySelector('table') || el;
-    else if(el.classList.contains('mermaid-wrap')) target = el.querySelector('svg') || el;
-    else if(el.classList.contains('chess-wrap')) target = el.querySelector('svg') || el;
-    else if(el.classList.contains('music-wrap')) target = el.querySelector('svg') || el;
-    else if(el.classList.contains('code-wrap')) target = el.querySelector('pre') || el;
+    if(el.classList.contains('table-wrap')) kind='table';
+    else if(el.classList.contains('mermaid-wrap') || el.classList.contains('chess-wrap') || el.classList.contains('music-wrap')) kind='svg';
+    else if(el.classList.contains('code-wrap')) kind='code';
   }
+  let target = el;
+  if(kind==='table') target = el.querySelector('table') || el;
+  else if(kind==='svg') target = el.querySelector('svg') || el;
+  else if(kind==='code') target = el.querySelector('pre') || el;
+
   const natW = target.scrollWidth || target.getBoundingClientRect().width;
   if(natW > availW + 1 && natW > 0){
-    wrapAndScale(target, availW / natW);
+    const factor = availW / natW;
+    if(kind==='svg') resizeSvgTo(target, natW*factor, (target.getBoundingClientRect().height||0)*factor);
+    else if(kind==='table') shrinkTableToFit(el, factor);
+    else if(kind==='code') shrinkCodeToFit(el, factor);
+    else wrapAndScale(target, factor);
   }
 }
 // Fallback: shrinks an entire unit uniformly when it's simply too tall for one page
 // (e.g. a big diagram) and can't be split without cutting it.
 function shrinkWholeUnit(u, factor){
-  u.el = wrapAndScale(u.el, Math.max(0.15, factor));
+  const el = u.el;
+  const svg = el.querySelector && el.querySelector('svg');
+  if(svg){
+    const w = svg.getBoundingClientRect().width || parseFloat(svg.getAttribute('width'))||0;
+    const h = svg.getBoundingClientRect().height || parseFloat(svg.getAttribute('height'))||0;
+    if(w && h) resizeSvgTo(svg, w*factor, h*factor);
+    return;
+  }
+  if(el.classList && el.classList.contains('table-wrap')){ shrinkTableToFit(el, factor); return; }
+  if(el.classList && el.classList.contains('code-wrap')){ shrinkCodeToFit(el, factor); return; }
+  u.el = wrapAndScale(el, Math.max(0.15, factor));
 }
 // Splits a table that's taller than one page into several page-sized chunks,
 // repeating the header row on each chunk so nothing reads as "cut".
@@ -2178,6 +2262,7 @@ function splitTableUnit(tableWrapEl, maxH, measureBox){
     const wrap = document.createElement('div');
     wrap.className = 'table-wrap';
     const tbl = document.createElement('table');
+    tbl.setAttribute('style', table.getAttribute('style')||'');
     if(thead) tbl.appendChild(thead.cloneNode(true));
     const tb = document.createElement('tbody');
     rowsForChunk.forEach(r=>tb.appendChild(r.cloneNode(true)));
@@ -2190,7 +2275,6 @@ function splitTableUnit(tableWrapEl, maxH, measureBox){
   const probe = buildChunk([]);
   measureBox.appendChild(probe);
   const probeTbody = probe.querySelector('tbody');
-  const baseH = unitFootprintHeight(probe);
   let curRows = [];
   rows.forEach(row=>{
     const clone = row.cloneNode(true);
@@ -2247,6 +2331,21 @@ function collectImageExportUnits(){
   return units;
 }
 
+// Measures the real, fully-laid-out height of a candidate page (same flex/padding
+// structure as the final page) so pagination can be verified and corrected -
+// this is what actually guarantees content never gets cut off mid-element.
+function measureCandidatePageHeight(units, stage, themeClass){
+  const box = document.createElement('div');
+  box.className = 'book-preview ' + themeClass;
+  box.style.cssText = `width:${IMG_PAGE_W}px;box-sizing:border-box;background:#fff;padding:${IMG_PAD}px;display:flex;flex-direction:column;gap:${IMG_GAP}px;height:auto;overflow:visible;`;
+  units.forEach(u=>box.appendChild(u.el));
+  stage.appendChild(box);
+  const h = box.getBoundingClientRect().height - IMG_PAD*2;
+  units.forEach(u=>box.removeChild(u.el)); // hand elements back, still usable for their real page
+  stage.removeChild(box);
+  return h;
+}
+
 // Paginates the book into an array of ready-to-render page <div>s, each
 // exactly IMG_PAGE_W×IMG_PAGE_H, appended (off-screen) to the document.
 function buildImageExportPages(){
@@ -2268,6 +2367,8 @@ function buildImageExportPages(){
   const finalUnits = [];
   units.forEach(u=>{
     measureBox.appendChild(u.el);
+    boostFontSizes(u.el, IMG_FONT_SCALE);
+    upscaleSvgIfPresent(u.el, IMG_FONT_SCALE);
     let h = unitFootprintHeight(u.el);
     if(h > maxContentH && u.el.classList && u.el.classList.contains('table-wrap')){
       measureBox.removeChild(u.el);
@@ -2316,11 +2417,42 @@ function buildImageExportPages(){
   });
   if(cur.length) pages.push(cur);
 
-  const pageEls = pages.map(pageUnits=>{
+  // Verification pass: re-measure each page in its *real* flex/gap layout and, if it
+  // turns out taller than the budget after all (font metrics, rounding, edge cases),
+  // push the overflowing tail unit(s) forward onto the next page instead of letting
+  // them get clipped by the page's overflow:hidden.
+  const verifiedPages = [];
+  let carry = [];
+  for(let p=0; p<pages.length; p++){
+    let pageUnits = carry.concat(pages[p]);
+    carry = [];
+    let guard = 0;
+    while(pageUnits.length>1 && guard<50){
+      const h = measureCandidatePageHeight(pageUnits, stage, themeClass);
+      if(h <= maxContentH) break;
+      carry.unshift(pageUnits.pop());
+      guard++;
+    }
+    verifiedPages.push(pageUnits);
+  }
+  while(carry.length){
+    // Any final overflow becomes its own extra page(s), verified the same way.
+    let pageUnits = carry; carry=[];
+    let guard=0;
+    while(pageUnits.length>1 && guard<50){
+      const h = measureCandidatePageHeight(pageUnits, stage, themeClass);
+      if(h <= maxContentH) break;
+      carry.unshift(pageUnits.pop());
+      guard++;
+    }
+    verifiedPages.push(pageUnits);
+  }
+
+  const pageEls = verifiedPages.map(pageUnits=>{
     const page = document.createElement('div');
     page.className = 'book-preview img-exp-page ' + themeClass;
     page.style.cssText = `width:${IMG_PAGE_W}px;height:${IMG_PAGE_H}px;box-sizing:border-box;background:#fff;padding:${IMG_PAD}px;overflow:hidden;display:flex;flex-direction:column;gap:${IMG_GAP}px;`;
-    pageUnits.forEach(u=>page.appendChild(u.el));
+    pageUnits.forEach(u=>{ u.el.style.flexShrink='0'; page.appendChild(u.el); });
     stage.appendChild(page);
     return page;
   });
@@ -2342,6 +2474,7 @@ async function downloadImages(){
   const dbHolder = { db:null }; // boxed so a retry can swap in a fresh connection mid-loop
   try{
     await ensureImgExportLibs(); // only fetched here, on first click - never on page load
+    try{ if(document.fonts && document.fonts.ready) await document.fonts.ready; }catch(e){}
     dbHolder.db = await imgExpDB();
     await imgExpClear(dbHolder.db);
     const built = buildImageExportPages();
@@ -2349,7 +2482,8 @@ async function downloadImages(){
     const pages = built.pageEls;
     const total = pages.length;
     if(!total){ toast('אין תוכן להמרה לתמונות','err'); resetImgExpState(); return; }
-    const bookTitle = sanitizeFileName(S.book.title || (S.toc && S.toc.book_title) || 'ספר');
+    let bookTitle = sanitizeFileName(S.book.title || (S.toc && S.toc.book_title) || 'ספר');
+    if(bookTitle.length > 70) bookTitle = bookTitle.slice(0,70).trim() + '…';
 
     _imgExp.phase='rendering'; _imgExp.total=total;
     for(let i=0;i<total;i++){
