@@ -9,7 +9,7 @@ yesterday's good recommendations (the front-end also ignores stale files
 older than ~36h — see TREND_RECS_MAX_AGE_MS in index.htm).
 
 Required env var: GEMINI_API_KEY
-Optional env vars: GEMINI_MODEL (default: gemini-2.0-flash), TRENDS_GEO (default: IL)
+Optional env vars: GEMINI_MODEL (default: gemini-3.5-flash), TRENDS_GEO (default: IL)
 
 No third-party dependencies (stdlib only), so no pip install step is needed
 in the workflow.
@@ -25,7 +25,9 @@ from datetime import datetime, timedelta, timezone
 GEO = os.environ.get("TRENDS_GEO", "IL")
 TRENDS_URL = "https://trends.google.com/trending/rss?geo=" + GEO
 NS = {"ht": "https://trends.google.com/trending/rss"}
-MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+# gemini-2.0-flash was shut down by Google (404). Use gemini-3.5-flash,
+# or gemini-3.1-flash-lite for a cheaper/faster option.
+MODEL = os.environ.get("GEMINI_MODEL") or "gemini-3.5-flash"
 API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 OUT_PATH = os.path.join("data", "trending-recs.json")
@@ -99,6 +101,7 @@ def build_prompt(trends, recent_topics):
     trends_block = "\n".join(lines) if lines else "(לא נמצאו טרנדים היום)"
     recent_block = ", ".join(recent_topics) if recent_topics else "(אין)"
 
+
     return (
         "אתה עוזר שמנתח רשימת טרנדים פופולריים בחיפוש בישראל (Google Trends) להיום, "
         "ומציע על בסיסם רעיונות למדריכים עבור כלי כתיבת ספרים בשם BookGenius.\n\n"
@@ -127,10 +130,11 @@ def build_prompt(trends, recent_topics):
     )
 
 
+
 def call_gemini(prompt):
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        + MODEL + ":generateContent?key=" + API_KEY
+        + MODEL + ":generateContent"
     )
     body = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -161,12 +165,26 @@ def call_gemini(prompt):
     req = urllib.request.Request(
         url,
         data=json.dumps(body).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        # The key goes in a header instead of the URL so it never shows up in logs.
+        headers={"Content-Type": "application/json", "x-goog-api-key": API_KEY},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
-    text = data["candidates"][0]["content"]["parts"][0]["text"]
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError("HTTP %s (model=%s): %s" % (e.code, MODEL, detail)) from None
+
+    candidates = data.get("candidates") or []
+    if not candidates:
+        raise RuntimeError("no candidates in response: " + json.dumps(data, ensure_ascii=False)[:500])
+
+    # Newer models may return "thought" parts too; keep only the real text parts.
+    parts = candidates[0].get("content", {}).get("parts", [])
+    text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
+    if not text.strip():
+        raise RuntimeError("empty text in response, finishReason=" + str(candidates[0].get("finishReason")))
     return json.loads(text)
 
 
