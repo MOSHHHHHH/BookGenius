@@ -1,0 +1,37 @@
+name: Trending Book Recommendations
+
+on:
+  schedule:
+    # 05:00 UTC ≈ 07:00/08:00 Israel time (depending on DST). Adjust as you like.
+    - cron: '0 5 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  update-recommendations:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Generate trending recommendations
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # TRENDS_GEO: IL            # default is already IL
+          # GEMINI_MODEL: gemini-2.0-flash   # override if you use a different model elsewhere
+        run: python scripts/trending_recommendations.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/trending-recs.json data/trending-recs-history.json
+          git diff --cached --quiet || git commit -m "chore: update trending book recommendations"
+          git push
