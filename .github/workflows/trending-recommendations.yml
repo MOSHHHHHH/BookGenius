@@ -3,18 +3,27 @@ name: Trending Book Recommendations
 on:
   schedule:
     # 05:00 UTC ≈ 07:00/08:00 Israel time (depending on DST). Adjust as you like.
+    # NOTE: GitHub runs scheduled workflows ONLY from the repo's default branch,
+    # so this file must live on the default branch (see TARGET_BRANCH below).
     - cron: '0 5 * * *'
   workflow_dispatch: {}
 
 permissions:
   contents: write
 
+env:
+  # The branch the job reads from and pushes to (the GitHub Pages branch).
+  # To change it in the future, edit only this line.
+  TARGET_BRANCH: '3.7PUB'
+
 jobs:
   update-recommendations:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout target branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -24,8 +33,8 @@ jobs:
       - name: Generate trending recommendations
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          # TRENDS_GEO: IL            # default is already IL
-          # GEMINI_MODEL: gemini-2.0-flash   # override if you use a different model elsewhere
+          # TRENDS_GEO: IL                   # default is already IL
+          # GEMINI_MODEL: gemini-3.5-flash   # default in the script; override here if needed
         run: python scripts/trending_recommendations.py
 
       - name: Commit and push if changed
@@ -34,4 +43,4 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/trending-recs.json data/trending-recs-history.json
           git diff --cached --quiet || git commit -m "chore: update trending book recommendations"
-          git push
+          git push origin HEAD:${{ env.TARGET_BRANCH }}
