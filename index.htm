@@ -233,6 +233,8 @@ mark.hl.cur{background:#ff9800;outline:2px solid #ff9800;border-radius:2px}
   border:1.5px solid var(--primary);color:var(--primary);background:var(--primary-dim);
   font-family:'Heebo',sans-serif;font-size:.8rem;font-weight:700;cursor:pointer;transition:all .2s;}
 .rec-btn:hover{background:var(--primary);color:#fff;transform:translateY(-1px)}
+.rec-btn.trend{border-color:#e8590c;color:#e8590c;background:#fff4e5}
+.rec-btn.trend:hover{background:#e8590c;color:#fff}
 /* LLM links shown after PiP opens */
 .llm-links{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px}
 .llm-link{display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:50px;
@@ -264,6 +266,8 @@ mark.hl.cur{background:#ff9800;outline:2px solid #ff9800;border-radius:2px}
 .seg-btn{padding:5px 12px;border-radius:6px;border:none;font-family:'Heebo',sans-serif;
   font-size:.78rem;font-weight:700;cursor:pointer;color:var(--muted);background:transparent;transition:all .18s}
 .seg-btn.active{background:#fff;color:var(--primary);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+@keyframes segBtnAttn{0%,100%{box-shadow:0 0 0 0 rgba(155,92,255,0);transform:scale(1)}50%{box-shadow:0 0 0 6px rgba(155,92,255,.3);transform:scale(1.06)}}
+.seg-btn.attn-blink{animation:segBtnAttn .9s ease-in-out 4;color:var(--primary)}
 .skills-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
 .skill-toggle{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;
   background:#f8f9ff;border:1.5px solid var(--border);cursor:pointer;transition:border-color .2s;user-select:none}
@@ -345,6 +349,7 @@ mark.hl.cur{background:#ff9800;outline:2px solid #ff9800;border-radius:2px}
 </head>
 <body>
 <div class="app">
+<input type="file" id="importJSONInput" accept="application/json,.json" style="display:none" onchange="handleImportJSONFile(event)">
 
 <!-- HEADER -->
 <header class="app-header">
@@ -387,6 +392,12 @@ mark.hl.cur{background:#ff9800;outline:2px solid #ff9800;border-radius:2px}
     <div class="rec-bar" id="recButtons"></div>
   </div>
 
+  <!-- TRENDING RECOMMENDATIONS (auto-generated daily from Google Trends IL) -->
+  <div id="trendRecBar" style="display:none;background:linear-gradient(135deg,#fff4e5,#ffe9f0);border-radius:12px;padding:14px 18px;border:1.5px solid var(--border)">
+    <p style="font-size:.75rem;font-weight:800;color:#e8590c;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">🔥 בהשראת הטרנדים בגוגל היום</p>
+    <div class="rec-bar" id="trendRecButtons"></div>
+  </div>
+
   <div class="form-grid">
     <div class="field"><label>נושא / כותרת הספר *</label><input type="text" id="s1_title" placeholder="למשל: מבוא לשחמט"></div>
     <div class="field"><label>מספר פרקים *</label><input type="number" id="s1_chapters" value="10" min="1" max="50"></div>
@@ -416,58 +427,93 @@ mark.hl.cur{background:#ff9800;outline:2px solid #ff9800;border-radius:2px}
   </div>
 </div>
 
-<!-- ══════════ STEP 2 — כתיבה (PiP) ══════════ -->
+<!-- ══════════ STEP 2 — כתיבה ══════════ -->
 <div id="step2" class="panel" style="padding:32px;gap:20px">
-  <div>
-    <p style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--primary);margin-bottom:6px">שלב שני</p>
-    <h2 class="sec-title">✍️ כתיבת הספר</h2>
-  </div>
-
-  <div class="info-card" style="background:linear-gradient(135deg,#e8f4fd,#edfff8);flex-direction:column;gap:10px">
-    <div style="display:flex;gap:12px;align-items:flex-start">
-      <span class="ic-icon">💡</span>
-      <p style="font-size:.87rem;line-height:1.75;color:var(--text)">
-        לאחר פתיחת חלון ה-PiP (תמונה בתוך תמונה) יש לפתוח בכרטיסיה חדשה את מודל השפה המועדף עליך:
-        <strong>Gemini, Claude, GPT</strong> או כל צ'אטבוט אחר.<br>
-        לאחר מכן בכל שלב יש להדביק (באמצעות <kbd style="background:#eee;padding:1px 5px;border-radius:4px;font-family:monospace;font-size:.85em">Ctrl+V</kbd>) את ההנחייה ולהעתיק את התשובה במלואה,
-        לאחר ההעתקה יש ללחוץ על <strong>"העתקתי את התשובה"</strong> בחלונית ה-PiP ולהמשיך לשלב הבא.<br>
-        <span style="color:var(--muted);font-size:.8rem">לתשומת לב: הכלי מותאם לדפדפן <strong>Chrome</strong> במערכת <strong>Windows</strong> בלבד.</span>
-      </p>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:14px">
+    <div>
+      <p style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--primary);margin-bottom:6px">שלב שני</p>
+      <h2 class="sec-title">✍️ כתיבת הספר</h2>
     </div>
-    <div id="pipBtnWrap" style="display:flex;align-items:center;flex-wrap:wrap;gap:10px">
-      <button id="pipOpenBtn" onclick="openPiP()" class="btn btn-primary" style="align-self:flex-start;gap:9px">
-        <i class="fas fa-clone"></i> פתח חלון PiP
-      </button>
-    </div>
-    <div id="llmLinksWrap" style="display:none;flex-direction:column;gap:6px">
-      <span class="llm-links-label">פתח מודל שפה:</span>
-      <div class="llm-links" id="llmLinksRow"></div>
+    <div class="seg-control" id="step2ModeCtrl">
+      <button class="seg-btn active" onclick="setStep2Mode('manual')" id="s2mManual"><i class="fas fa-hand-pointer"></i> ידני (PiP)</button>
+      <button class="seg-btn" onclick="setStep2Mode('agent')" id="s2mAgent">🧪 בטא — סוכן AI</button>
     </div>
   </div>
 
-  <!-- PiP fallback inline (shown on error) -->
-  <div id="pipInline" style="display:none">
-    <div class="pip-title-bar">
-      <span class="pip-book-title" id="piTitle">BookGenius</span>
-      <span class="pip-step-badge" id="piStep">מבוא ופרטי ספר</span>
+  <!-- ── MANUAL MODE (PiP) ── -->
+  <div id="step2ManualWrap" style="display:flex;flex-direction:column;gap:20px">
+    <div class="info-card" style="background:linear-gradient(135deg,#e8f4fd,#edfff8);flex-direction:column;gap:10px">
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <span class="ic-icon">💡</span>
+        <p style="font-size:.87rem;line-height:1.75;color:var(--text)">
+          לאחר פתיחת חלון ה-PiP (תמונה בתוך תמונה) יש לפתוח בכרטיסיה חדשה את מודל השפה המועדף עליך:
+          <strong>Gemini, Claude, GPT</strong> או כל צ'אטבוט אחר.<br>
+          לאחר מכן בכל שלב יש להדביק (באמצעות <kbd style="background:#eee;padding:1px 5px;border-radius:4px;font-family:monospace;font-size:.85em">Ctrl+V</kbd>) את ההנחייה ולהעתיק את התשובה במלואה,
+          לאחר ההעתקה יש ללחוץ על <strong>"העתקתי את התשובה"</strong> בחלונית ה-PiP ולהמשיך לשלב הבא.<br>
+          <span style="color:var(--muted);font-size:.8rem">לתשומת לב: הכלי מותאם לדפדפן <strong>Chrome</strong> במערכת <strong>Windows</strong> בלבד.</span>
+        </p>
+      </div>
+      <div id="pipBtnWrap" style="display:flex;align-items:center;flex-wrap:wrap;gap:10px">
+        <button id="pipOpenBtn" onclick="openPiP()" class="btn btn-primary" style="align-self:flex-start;gap:9px">
+          <i class="fas fa-clone"></i> פתח חלון PiP
+        </button>
+      </div>
+      <div id="llmLinksWrap" style="display:none;flex-direction:column;gap:6px">
+        <span class="llm-links-label">פתח מודל שפה:</span>
+        <div class="llm-links" id="llmLinksRow"></div>
+      </div>
     </div>
-    <div class="pip-ch-name" id="piChName"></div>
-    <div class="pip-msg" id="piMsg">מתחיל...</div>
-    <div class="pip-batch">
-      <span class="pip-batch-lbl">פרקים בפעם:</span>
-      <button class="pbtn sel" onclick="pipSetBatch(1)" id="pib1">1</button>
-      <button class="pbtn" onclick="pipSetBatch(2)" id="pib2">2</button>
-      <button class="pbtn" onclick="pipSetBatch(3)" id="pib3">3</button>
-      <button class="pbtn" onclick="pipSetBatch(4)" id="pib4">4</button>
+
+    <!-- PiP fallback inline (shown on error) -->
+    <div id="pipInline" style="display:none">
+      <div class="pip-title-bar">
+        <span class="pip-book-title" id="piTitle">BookGenius</span>
+        <span class="pip-step-badge" id="piStep">מבוא ופרטי ספר</span>
+      </div>
+      <div class="pip-ch-name" id="piChName"></div>
+      <div class="pip-msg" id="piMsg">מתחיל...</div>
+      <div class="pip-batch">
+        <span class="pip-batch-lbl">פרקים בפעם:</span>
+        <button class="pbtn sel" onclick="pipSetBatch(1)" id="pib1">1</button>
+        <button class="pbtn" onclick="pipSetBatch(2)" id="pib2">2</button>
+        <button class="pbtn" onclick="pipSetBatch(3)" id="pib3">3</button>
+        <button class="pbtn" onclick="pipSetBatch(4)" id="pib4">4</button>
+      </div>
+      <div class="pip-actions">
+        <button class="pip-action-btn secondary" onclick="pipCopyAgain()"><i class="fas fa-copy"></i> העתק שוב</button>
+        <button class="pip-action-btn primary" onclick="pipPasteAndProcess()"><i class="fas fa-clipboard-check"></i> העתקתי את התשובה</button>
+      </div>
+      <div id="pipManualWrap" style="display:none;margin-top:10px">
+        <textarea id="pipManualTA" rows="4" placeholder="הדבק כאן את תשובת ה-LLM (Ctrl+V)..." dir="ltr"
+          style="width:100%;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.3);border-radius:8px;padding:8px 10px;color:#fff;font-family:monospace;font-size:.75rem;resize:vertical;outline:none"></textarea>
+        <button class="pip-action-btn primary" style="margin-top:6px;width:100%" onclick="pipManualSubmit()"><i class="fas fa-check"></i> אשר ועבד</button>
+      </div>
     </div>
-    <div class="pip-actions">
-      <button class="pip-action-btn secondary" onclick="pipCopyAgain()"><i class="fas fa-copy"></i> העתק שוב</button>
-      <button class="pip-action-btn primary" onclick="pipPasteAndProcess()"><i class="fas fa-clipboard-check"></i> העתקתי את התשובה</button>
-    </div>
-    <div id="pipManualWrap" style="display:none;margin-top:10px">
-      <textarea id="pipManualTA" rows="4" placeholder="הדבק כאן את תשובת ה-LLM (Ctrl+V)..." dir="ltr"
-        style="width:100%;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.3);border-radius:8px;padding:8px 10px;color:#fff;font-family:monospace;font-size:.75rem;resize:vertical;outline:none"></textarea>
-      <button class="pip-action-btn primary" style="margin-top:6px;width:100%" onclick="pipManualSubmit()"><i class="fas fa-check"></i> אשר ועבד</button>
+  </div>
+
+  <!-- ── AGENT MODE (BETA) ── -->
+  <div id="step2AgentWrap" style="display:none;flex-direction:column;gap:16px">
+    <div class="info-card" style="background:linear-gradient(135deg,#f0eeff,#fdeefc);flex-direction:column;gap:14px">
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <span class="ic-icon">🤖</span>
+        <p style="font-size:.87rem;line-height:1.75;color:var(--text)">
+          במקום להעתיק־להדביק הנחייה בנפרד לכל פרק, העתיקו את ההנחייה המלאה — היא כבר כוללת את פרטי הספר שמילאתם — והדביקו אותה בשיחה חדשה עם צ'אטבוט בעל <strong>יכולות תכנות וסוכנות</strong> (כגון Claude).
+          הוא יכתוב את כל הספר בעצמו — תוכן עניינים ואז פרק־פרק, כולל אימות אוטומטי לכל פרק — ובסוף יפיק עבורכם קובץ JSON שאותו תעלו לכאן, ומיד תוכלו להוריד את הספר.
+        </p>
+      </div>
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px">
+        <button onclick="copyAgentPrompt()" id="agentCopyBadge" class="btn btn-primary" style="gap:9px">
+          <i class="fas fa-copy"></i> העתק הנחייה
+        </button>
+        <a class="llm-link" href="https://claude.ai" target="_blank" rel="noopener" onclick="copyAgentPrompt()">
+          <img src="https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://claude.ai&size=32" alt="Claude" onerror="this.style.display='none'">
+          Claude
+        </a>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding-top:2px;border-top:1px solid rgba(0,0,0,.06);margin-top:2px">
+        <p style="font-size:.76rem;color:var(--muted);line-height:1.6">קיבלתם מהסוכן קובץ JSON? ייבאו אותו כאן ישירות לתצוגת הספר המוכן:</p>
+        <button onclick="triggerImportJSON()" class="btn btn-outline" style="font-size:.8rem;padding:8px 16px;flex-shrink:0"><i class="fas fa-file-import"></i> ייבוא קובץ JSON</button>
+      </div>
     </div>
   </div>
 
@@ -478,6 +524,7 @@ mark.hl.cur{background:#ff9800;outline:2px solid #ff9800;border-radius:2px}
     </button>
   </div>
 </div>
+
 
 <!-- ══════════ STEP 3 — הצגה ויצוא ══════════ -->
 <div id="step3" class="panel" style="flex-direction:column">
@@ -691,6 +738,13 @@ mark.hl.cur{background:#ff9800;outline:2px solid #ff9800;border-radius:2px}
           <div class="setting-sub">העתק הוראה קבועה לפלטפורמת ה-AI שבה אתה משתמש</div>
         </div>
         <button onclick="openCustomInstructions()" class="btn btn-outline" style="padding:6px 14px;font-size:.8rem;flex-shrink:0"><i class="fas fa-copy"></i> העתק</button>
+      </div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-label">ייבוא ספר מ-JSON (בטא)</div>
+          <div class="setting-sub">טענו קובץ שהופק על ידי מצב הבטא (שלב 2) — הספר ייפתח מוכן לתצוגה</div>
+        </div>
+        <button onclick="triggerImportJSON()" class="btn btn-outline" style="padding:6px 14px;font-size:.8rem;flex-shrink:0"><i class="fas fa-file-import"></i> ייבוא</button>
       </div>
     </div>
     <!-- BOOK SETTINGS -->
@@ -1235,6 +1289,298 @@ function buildChapterPrompt(chs){
   return `You are a professional book writer. You are now talking to an API, so make sure you write exactly as I instructed you.\nWrite me ${chHeader} for book "${b.title}" - ${b.desc} as requested by the user.\n${isM?`Chapters to write:\n${chList}\n`:''}\nWrite this in JSON format only, per the agreement below. Output nothing but a JSON object. If the user specifically requests it, the book should be written in great detail, without sparing words, in Hebrew and in professional but fluent language. The specific user request within the tags always overrides the length, style and language requirement, but never the format limitations.\nOriginal user request: subject: ${b.title}, details: ${b.desc}${b.extra?', additional instructions: '+b.extra:', additional instructions: None'}.\n${codeWarn}${chapterSchema(chNums)}\n\nFor context, here are all the chapters:\n${JSON.stringify(S.toc,null,2)}\n${skills?'\nOptional visual blocks — use only where they genuinely improve understanding:'+skills:''}`;
 }
 
+/* ══════════════════════════════════════════════
+   BETA — AGENT MODE (autonomous coding/agentic LLM)
+   One long master prompt that lets a chat bot with
+   coding + agentic capabilities (e.g. Claude Code,
+   ChatGPT with a code/agent mode, Cursor, etc.) run
+   the entire content→chapters→validation→book pipeline
+   on its own, without manual copy/paste per chapter.
+   ══════════════════════════════════════════════ */
+/* Deterministic chapter-validation script, provided ready-made to the agent
+   so it doesn't need to author structural JSON checks from scratch each run.
+   Usage: python validate_chapter.py chapter.json skills.json <chapter_number> */
+const AGENT_VALIDATOR_PY=
+'import json, sys\n'+
+'\n'+
+'ALLOWED = {\n'+
+'    "text": ["text"],\n'+
+'    "heading": ["text"],\n'+
+'    "callout": ["variant", "title", "text"],\n'+
+'    "blockquote": ["text"],\n'+
+'    "table": ["headers", "rows"],\n'+
+'    "story": ["title", "text"],\n'+
+'    "chess": ["fen", "caption"],\n'+
+'    "music": ["abc", "caption"],\n'+
+'    "code": ["language", "code"],\n'+
+'    "math": ["latex"],\n'+
+'    "mermaid": ["code"],\n'+
+'}\n'+
+'TEXT_FIELDS = {\n'+
+'    "text": ["text"], "heading": ["text"], "callout": ["title", "text"],\n'+
+'    "blockquote": ["text"], "story": ["title", "text"], "table": ["caption"],\n'+
+'}\n'+
+'SKILL_GATED = {"chess": "chess", "music": "music", "code": "code", "math": "math", "mermaid": "mermaid"}\n'+
+'\n'+
+'def word_count(s):\n'+
+'    return len((s or "").split())\n'+
+'\n'+
+'def main():\n'+
+'    if len(sys.argv) < 4:\n'+
+'        print("Usage: python validate_chapter.py <chapter.json> <skills.json> <expected_chapter_number>")\n'+
+'        sys.exit(2)\n'+
+'    chapter_path, skills_path, expected_num = sys.argv[1], sys.argv[2], int(sys.argv[3])\n'+
+'    errors = []\n'+
+'\n'+
+'    try:\n'+
+'        with open(chapter_path, encoding="utf-8") as f:\n'+
+'            data = json.load(f)\n'+
+'    except Exception as e:\n'+
+'        print("FAIL: chapter JSON does not parse:", e)\n'+
+'        sys.exit(1)\n'+
+'\n'+
+'    try:\n'+
+'        with open(skills_path, encoding="utf-8") as f:\n'+
+'            skills = json.load(f)\n'+
+'    except Exception as e:\n'+
+'        print("FAIL: skills JSON does not parse:", e)\n'+
+'        sys.exit(1)\n'+
+'\n'+
+'    if "validation" not in data or "chapters" not in data:\n'+
+'        errors.append("missing top-level \'validation\' or \'chapters\' key")\n'+
+'    else:\n'+
+'        vnums = data["validation"].get("chapter_numbers")\n'+
+'        if vnums != [expected_num]:\n'+
+'            errors.append("validation.chapter_numbers is " + str(vnums) + ", expected [" + str(expected_num) + "]")\n'+
+'        chs = data["chapters"]\n'+
+'        if not isinstance(chs, list) or len(chs) != 1:\n'+
+'            errors.append("\'chapters\' must be an array with exactly 1 item")\n'+
+'        else:\n'+
+'            ch = chs[0]\n'+
+'            if ch.get("chapter_number") != expected_num:\n'+
+'                errors.append("chapter_number is " + str(ch.get("chapter_number")) + ", expected " + str(expected_num))\n'+
+'            if not ch.get("title"):\n'+
+'                errors.append("chapter title is missing or empty")\n'+
+'            content = ch.get("content")\n'+
+'            if not isinstance(content, list) or not content:\n'+
+'                errors.append("content must be a non-empty array")\n'+
+'            else:\n'+
+'                total_words = 0\n'+
+'                for i, block in enumerate(content):\n'+
+'                    t = block.get("type")\n'+
+'                    if t not in ALLOWED:\n'+
+'                        errors.append("block #" + str(i) + ": unknown type \'" + str(t) + "\'")\n'+
+'                        continue\n'+
+'                    for req in ALLOWED[t]:\n'+
+'                        if req not in block:\n'+
+'                            errors.append("block #" + str(i) + " (type=" + t + "): missing required field \'" + req + "\'")\n'+
+'                    if t in SKILL_GATED and not skills.get(SKILL_GATED[t]):\n'+
+'                        errors.append("block #" + str(i) + ": type \'" + t + "\' used but skills." + SKILL_GATED[t] + " is false")\n'+
+'                    for field in TEXT_FIELDS.get(t, []):\n'+
+'                        total_words += word_count(block.get(field, ""))\n'+
+'                if total_words < 1500:\n'+
+'                    errors.append("total word count is " + str(total_words) + ", need at least 1500")\n'+
+'\n'+
+'    if errors:\n'+
+'        print("FAIL:")\n'+
+'        for e in errors:\n'+
+'            print(" -", e)\n'+
+'        sys.exit(1)\n'+
+'    else:\n'+
+'        print("PASS: chapter", expected_num, "looks structurally valid.")\n'+
+'        sys.exit(0)\n'+
+'\n'+
+'main()';
+
+function buildAgentModePrompt(){
+  syncForm();
+  const b=S.book;
+  const bs=getActiveBS();
+  const title=b.title||'(book title — ask the user if missing)';
+  const desc=b.desc||'(book description — ask the user if missing)';
+  const chCount=b.chapters||10;
+  const intro=!!b.intro;
+  const extra=b.extra?b.extra:'None';
+  const manual=bs.skillsMode==='manual';
+  const ms=bs.manualSkills||{};
+
+  /* ── Step 1 (TOC) skills guidance — matches the regular flow exactly:
+     auto mode → the writer decides chess/music/code/math itself (no mermaid,
+     since mermaid is never auto-detected in the regular flow either);
+     manual mode → the flags are already fixed in Book Settings. ── */
+  const skillsGuidance=manual
+    ?`The visual skills for this book have already been fixed by the user in Book Settings — do not decide them yourself. In the TOC JSON's "skills" object, output exactly these fixed values: {"chess": ${!!ms.chess}, "music": ${!!ms.music}, "code": ${!!ms.code}, "math": ${!!ms.math}}.
+(Diagram support is fixed separately — mermaid: ${!!ms.mermaid} — this only controls whether the "mermaid" block type may appear in chapters in Step 2; it is not part of the "skills" object below.)`
+    :`Decide these yourself and include them in the "skills" object below — set a flag to true only when it will genuinely serve the content (never just for variety):
+- chess: chessboard diagrams from FEN — only for chess-related books.
+- music: ABC music notation — only for music-related books.
+- code: syntax-highlighted code blocks — for programming/technical/instructional books.
+- math: LaTeX formulas — for math/science/engineering/economics books.
+When in doubt, use false.`;
+
+  /* ── Step 2 (chapters) content block types — mirrors the regular app's
+     chapterSchema() logic exactly, using the same Book Settings. ── */
+  const ct=[];
+  ct.push(`{"description":"Paragraph of text. To bold a word or phrase wrap it in double asterisks: **like this**. Use bold sparingly for key terms only.","properties":{"type":{"const":"text"},"text":{"type":"string"}},"required":["type","text"]}`);
+  ct.push(`{"description":"Section sub-heading","properties":{"type":{"const":"heading"},"text":{"type":"string"}},"required":["type","text"]}`);
+  if(bs.callouts!==false)ct.push(`{"description":"Highlighted callout box — use for tips, warnings, important notes, or errors.","properties":{"type":{"const":"callout"},"variant":{"type":"string","enum":["tip","warning","info","error"]},"title":{"type":"string"},"text":{"type":"string"}},"required":["type","variant","title","text"]}`);
+  if(bs.blockquotes!==false)ct.push(`{"description":"Blockquote — use ONLY for real, verifiable quotes from named real people, historical figures, or published sources. Do NOT invent quotes or use generic/placeholder attributions.","properties":{"type":{"const":"blockquote"},"text":{"type":"string","description":"The exact quote text"},"author":{"type":"string","description":"Full real name and context, e.g. 'Albert Einstein, 1921'"}},"required":["type","text"]}`);
+  ct.push(`{"description":"Data table — use for comparisons, statistics, structured data.","properties":{"type":{"const":"table"},"headers":{"type":"array","items":{"type":"string"}},"rows":{"type":"array","items":{"type":"array","items":{"type":"string"}}},"caption":{"type":"string"}},"required":["type","headers","rows"]}`);
+  if(bs.shortStories)ct.push(`{"description":"Short illustrative story — a brief narrative (200-400 words) that illustrates the chapter topic. Use sparingly, 1 per chapter maximum.","properties":{"type":{"const":"story"},"title":{"type":"string"},"text":{"type":"string","description":"Use \\\\n for paragraph breaks"}},"required":["type","title","text"]}`);
+  if(manual){
+    if(ms.chess)ct.push(`{"description":"Chess position","properties":{"type":{"const":"chess"},"fen":{"type":"string"},"caption":{"type":"string"}},"required":["type","fen","caption"]}`);
+    if(ms.music)ct.push(`{"description":"ABC music notation","properties":{"type":{"const":"music"},"abc":{"type":"string","description":"ABC notation with \\\\n for newlines"},"caption":{"type":"string"}},"required":["type","abc","caption"]}`);
+    if(ms.code)ct.push(`{"description":"Code example — CRITICAL: use \\\\n for line breaks, NO literal newlines in the code field","properties":{"type":{"const":"code"},"language":{"type":"string"},"code":{"type":"string"},"caption":{"type":"string"}},"required":["type","language","code"]}`);
+    if(ms.math)ct.push(`{"description":"LaTeX formula","properties":{"type":{"const":"math"},"latex":{"type":"string"},"caption":{"type":"string"}},"required":["type","latex"]}`);
+    if(ms.mermaid)ct.push(`{"description":"Mermaid diagram — flowcharts, sequence diagrams, mindmaps, ER diagrams, Gantt charts etc. CRITICAL: use \\\\n for newlines inside the code string, never literal newlines.","properties":{"type":{"const":"mermaid"},"code":{"type":"string","description":"Valid Mermaid syntax with \\\\n for newlines"},"caption":{"type":"string"}},"required":["type","code"]}`);
+  }else{
+    ct.push(`{"description":"Chess position (use only if you set skills.chess=true in Step 1)","properties":{"type":{"const":"chess"},"fen":{"type":"string"},"caption":{"type":"string"}},"required":["type","fen","caption"]}`);
+    ct.push(`{"description":"ABC music notation (use only if you set skills.music=true in Step 1)","properties":{"type":{"const":"music"},"abc":{"type":"string","description":"ABC notation with \\\\n for newlines"},"caption":{"type":"string"}},"required":["type","abc","caption"]}`);
+    ct.push(`{"description":"Code example (use only if you set skills.code=true in Step 1) — CRITICAL: use \\\\n for line breaks, NO literal newlines in the code field","properties":{"type":{"const":"code"},"language":{"type":"string"},"code":{"type":"string"},"caption":{"type":"string"}},"required":["type","language","code"]}`);
+    ct.push(`{"description":"LaTeX formula (use only if you set skills.math=true in Step 1)","properties":{"type":{"const":"math"},"latex":{"type":"string"},"caption":{"type":"string"}},"required":["type","latex"]}`);
+  }
+
+  const skillsJsonHint=manual
+    ?`{"chess": ${!!ms.chess}, "music": ${!!ms.music}, "code": ${!!ms.code}, "math": ${!!ms.math}, "mermaid": ${!!ms.mermaid}}`
+    :`{"chess": <from your Step 1 decision>, "music": <...>, "code": <...>, "math": <...>, "mermaid": false}`;
+
+  return `You are an autonomous "book-writing agent" for a tool called BookGenius (https://moshhhhhh.github.io/BookGenius). This is a beta mode: normally the user must manually copy a prompt, paste it into an external LLM, copy the response back, and repeat that once for the table of contents and once per chapter. Here, you perform that entire pipeline yourself, end to end, in one continuous run, without the user manually relaying anything between steps.
+
+Your role is twofold: you are both the WRITER (the LLM that would normally receive each prompt) and the OPERATOR (the agent that would normally copy/paste between steps) — so you are responsible both for producing the content and for validating it yourself before moving on.
+
+═══════════════════════════════
+BOOK DETAILS (already provided by the user — do not ask again)
+═══════════════════════════════
+- Title / subject: ${title}
+- Description / purpose / audience: ${desc}
+- Number of chapters: ${chCount}
+- Include an introduction chapter (chapter number 0): ${intro?'Yes':'No'}
+- Additional writing instructions: ${extra}
+- Final output: a single JSON file (see Step 5) — this is the only deliverable.
+
+═══════════════════════════════
+GROUND RULES
+═══════════════════════════════
+1. Every content output (table of contents, chapters) must be a single, strictly valid JSON object, matching the schemas below exactly — no Markdown fences (no ${'```'}), no commentary around the JSON.
+2. Work chapter by chapter — one chapter at a time, in order — never all chapters at once. Never skip the validation step between chapters.
+3. Content language: professional, fluent, rich Hebrew — unless the user explicitly asked for a different language. If anything in "Additional writing instructions" conflicts with the length/style/language guidance here, the user's instructions win, but they never override the JSON structure itself.
+4. Do not stop for user confirmation between chapters. Keep going until the whole book is done. Only stop and ask the user if: (a) something essential is genuinely missing from the book details above, or (b) a chapter fails validation twice in a row and you need guidance.
+5. After each chapter, report only a short one-line progress update (e.g. "✓ Chapter 3/12: <title> — done and validated") — never paste the full chapter content into the chat, to avoid flooding the conversation.
+
+═══════════════════════════════
+STEP 1 — Generate the table of contents (TOC)
+═══════════════════════════════
+Write a single JSON object matching this schema (shown as JSON Schema for reference only — your actual output is a plain data object, not a schema):
+
+{"type":"object","properties":{"book_title":{"type":"string"},"book_description":{"type":"string","description":"1-2 sentence summary in Hebrew"},"skills":{"type":"object","properties":{"chess":{"type":"boolean"},"music":{"type":"boolean"},"code":{"type":"boolean"},"math":{"type":"boolean"}},"required":["chess","music","code","math"]},"chapters":{"type":"array","items":{"type":"object","properties":{"chapter_number":{"type":"integer","description":"0 = introduction chapter if included, otherwise 1,2,3... in ascending order"},"title":{"type":"string"},"description":{"type":"string","description":"2-3 sentence chapter summary in Hebrew"}},"required":["chapter_number","title","description"]}},"book_recommendations":{"type":"array","description":"Exactly 3 book suggestions on related topics","items":{"type":"object","properties":{"topic":{"type":"string"},"desc":{"type":"string"},"writing_instructions":{"type":"string"},"chapters":{"type":"integer","description":"5-15"}},"required":["topic","desc","writing_instructions","chapters"]}}},"required":["book_title","book_description","skills","chapters","book_recommendations"]}
+
+Guidance for "skills": ${skillsGuidance}
+
+After generating it, validate it yourself: the JSON parses correctly; the "chapters" array length matches the requested chapter count (plus 1 if an introduction chapter was requested); numbering is sequential and ascending (0..N or 1..N); all required fields are present; "book_recommendations" contains exactly 3 items. If anything is wrong, fix it and regenerate — without involving the user.
+
+Once the TOC is finalized, save a small skills.json file for use in Step 3, shaped like this: ${skillsJsonHint}
+
+═══════════════════════════════
+STEP 2 — Write the chapters, one chapter at a time
+═══════════════════════════════
+For each chapter, in order, write a JSON object matching this schema:
+
+{"type":"object","properties":{"validation":{"type":"object","properties":{"chapter_numbers":{"type":"array","items":{"type":"integer"},"description":"Exactly [current chapter number]"},"book_title":{"type":"string"}},"required":["chapter_numbers","book_title"]},"chapters":{"type":"array","description":"Array with exactly 1 chapter","items":{"type":"object","properties":{"chapter_number":{"type":"integer"},"title":{"type":"string"},"content":{"type":"array","description":"At least 1500 words total","items":{"oneOf":[
+${ct.join(',\n')}
+]}}},"required":["chapter_number","title","content"]}}},"required":["validation","chapters"]}
+
+Important notes:
+- "content" is a single array, in reading order, mixing block types as needed per the schema above.
+- In every code / abc (music) / mermaid "code" field, write \\n for line breaks and \\\\ for backslashes — never a literal newline character inside the JSON string.
+- Count words across all text-bearing fields (text, heading, callout.text, blockquote.text, story.text) — the total must be at least 1500 words per chapter.
+- Use the full table of contents (all chapters) as context for every chapter, to keep names, terminology and narrative/logical continuity consistent across chapters.
+
+═══════════════════════════════
+STEP 3 — Automated validation for every chapter (mandatory, before moving to the next chapter)
+═══════════════════════════════
+For every chapter you write, run two layers of validation:
+
+a) Deterministic structural checks — a ready-made Python script is provided below so you don't need to write this logic yourself every time. Save it exactly as validate_chapter.py, save the current chapter's JSON as chapter.json, and run: python validate_chapter.py chapter.json skills.json <chapter_number>. If it prints FAIL, fix the listed issues and regenerate the chapter before moving on. You are of course free to use different or additional code of your own (another language, extra checks, etc.) if you prefer — this script is provided only to save you time, not to limit you.
+
+===== תחילת קוד =====
+${AGENT_VALIDATOR_PY}
+===== סוף קוד =====
+
+b) Logical/content review (done by you, reading the text critically as if you were a different, skeptical reader):
+   - The chapter genuinely covers the topic described in its TOC "description".
+   - No factual, plot, or numerical contradictions with earlier chapters (names, data, terminology, chronology).
+   - No unnecessary repetition of content already covered in earlier chapters.
+   - Any quotes are real and verifiable, never invented.
+   - The language is professional, fluent, and free of obvious spelling/grammar errors.
+
+If anything fails (either layer): rewrite the chapter (up to 2 retries), addressing the specific problem found. If it still fails after 2 retries, keep the best version produced, note it in one line in a "known issues" log for the final summary, and move on to the next chapter — never get stuck.
+
+═══════════════════════════════
+STEP 4 — Assemble the finished book into a single object
+═══════════════════════════════
+Once every chapter is written and validated, assemble a single JSON object with this exact structure (this matches BookGenius' internal app state precisely — any change to field names will break importing it):
+
+{
+  "book": {"title": "<book_title from the TOC>", "desc": "<the original description from the book details above>", "chapters": <the requested chapter count, not counting the intro chapter>, "extra": "<additional instructions from the book details above, or an empty string>", "intro": <true/false>},
+  "toc": <the complete TOC object exactly as produced at the end of Step 1, with "chapters" sorted by chapter_number ascending>,
+  "done": {
+    "<chapter_number>": <the full chapter object from the end of Step 2, including chapter_number/title/content>,
+    "...": "one entry per chapter, keyed by chapter_number as a string, until every chapter is present"
+  }
+}
+
+═══════════════════════════════
+STEP 5 — Deliver the final output
+═══════════════════════════════
+Save the Step 4 object exactly as-is as a single JSON file named "<book title>.bookgenius.json", and deliver it to the user the normal way for your environment (a real downloadable/attached file) — never as raw text pasted into the chat.
+
+Then tell the user, in Hebrew, exactly the following sentence (copy it as-is, don't translate or rephrase it):
+"כדי לפתוח את הספר: היכנסו ל-BookGenius בכתובת https://moshhhhhh.github.io/BookGenius, לחצו על ⚙ הגדרות, ואז על ״ייבוא ספר מ-JSON (בטא)״, ובחרו את הקובץ שהורדתם."
+
+═══════════════════════════════
+FINAL SUMMARY (one message at the end of the whole process)
+═══════════════════════════════
+Tell the user: the book title, the number of chapters written, an approximate total word count, the name of the file delivered, and the "known issues" log if any (empty if every chapter passed validation cleanly).`;
+}
+function flashAgentButton(){
+  const btn=$('s2mAgent');if(!btn)return;
+  btn.classList.remove('attn-blink');void btn.offsetWidth;btn.classList.add('attn-blink');
+  setTimeout(()=>btn.classList.remove('attn-blink'),4800);
+}
+function setStep2Mode(mode){
+  $('s2mManual').classList.toggle('active',mode==='manual');
+  $('s2mAgent').classList.toggle('active',mode==='agent');
+  $('step2ManualWrap').style.display=mode==='manual'?'flex':'none';
+  $('step2AgentWrap').style.display=mode==='agent'?'flex':'none';
+}
+function copyAgentPrompt(){
+  _copyToClipboard(buildAgentModePrompt());
+  toast('ההנחייה המלאה הועתקה — הדביקו אותה בצ\'אטבוט עם יכולות תכנות/סוכנות','ok');
+}
+function triggerImportJSON(){$('importJSONInput')?.click();}
+async function handleImportJSONFile(ev){
+  const file=ev.target.files&&ev.target.files[0];
+  ev.target.value='';
+  if(!file)return;
+  try{
+    const text=await file.text();
+    const data=JSON.parse(text);
+    if(!data||typeof data!=='object'||!data.toc||!data.done||!Array.isArray(data.toc.chapters))
+      throw new Error('מבנה הקובץ אינו תואם — חסרים toc/done תקינים');
+    S.book=Object.assign({title:'',desc:'',chapters:data.toc.chapters.length,extra:'',intro:false},data.book||{},{title:data.book?.title||data.toc.book_title||'ספר ללא שם'});
+    S.toc=data.toc;
+    if(!S.toc.skills||typeof S.toc.skills!=='object')S.toc.skills={chess:false,music:false,code:false,math:false,mermaid:false};
+    S.done=data.done;
+    S.step=3;S.curBatch=[];
+    save();updateHeader();updateProgress();
+    $('settingsModal')?.classList.remove('open');
+    showBook();
+    toast('הספר יובא בהצלחה 🎉','ok');
+  }catch(e){
+    toast('שגיאה בייבוא הקובץ: '+e.message,'err',4500);
+  }
+}
+
 /* ── RECOMMENDATIONS ── */
 const DEFAULT_RECS=[
   {topic:'מבוא לשחמט',desc:'ספר מקיף למתחילים המסביר את יסודות המשחק, הכלים, האסטרטגיה והטקטיקה.',writing_instructions:'כתוב בשפה ברורה ונגישה, עם דיאגרמות שחמט מפורטות.',chapters:10},
@@ -1261,6 +1607,35 @@ function applyRec(i){
   $('s1_extra').value=r.writing_instructions||'';
 }
 
+/* ── TRENDING RECOMMENDATIONS (data/trending-recs.json, refreshed daily by a GitHub Action) ── */
+const TREND_RECS_URL='./data/trending-recs.json';
+const TREND_RECS_MAX_AGE_MS=36*60*60*1000; // hide if the file is older than 36h (e.g. the Action stopped running)
+let _trendRecs=[];
+async function renderTrendRecs(){
+  const bar=$('trendRecBar'),btns=$('trendRecButtons');
+  if(!bar||!btns)return;
+  try{
+    const res=await fetch(TREND_RECS_URL,{cache:'no-store'});
+    if(!res.ok)throw new Error('missing');
+    const data=await res.json();
+    const recs=Array.isArray(data.recommendations)?data.recommendations:[];
+    if(!recs.length)throw new Error('empty');
+    if(data.generated_at&&(Date.now()-new Date(data.generated_at).getTime())>TREND_RECS_MAX_AGE_MS)throw new Error('stale');
+    _trendRecs=recs;
+    btns.innerHTML=recs.map((r,i)=>`<button class="rec-btn trend" onclick="applyTrendRec(${i})"><i class="fas fa-fire"></i> ${esc(r.topic)}</button>`).join('');
+    bar.style.display='block';
+  }catch(e){
+    bar.style.display='none';
+  }
+}
+function applyTrendRec(i){
+  const r=_trendRecs[i];if(!r)return;
+  $('s1_title').value=r.topic||'';
+  $('s1_desc').value=r.desc||'';
+  $('s1_chapters').value=r.chapters||10;
+  $('s1_extra').value=r.writing_instructions||'';
+}
+
 /* ── STEP 1 SUBMIT ── */
 function step1Submit(){
   syncForm();
@@ -1269,8 +1644,10 @@ function step1Submit(){
   _checkPreStep2Prompts(()=>{
     _curPrompt=buildTOCPrompt();
     _curPhase='toc';
+    setStep2Mode('manual');
     goStep(2);
     pipInit();
+    flashAgentButton();
   });
 }
 
@@ -1507,7 +1884,7 @@ async function _processChapterPaste(raw){
       S.done[n]=ch;
     }
     S.curBatch=[];
-    renderRecs();updateProgress();save();
+    renderRecs();renderTrendRecs();updateProgress();save();
     // If we were in chapter-edit mode, refresh the book preview
     const wasEditing=_editChNum!==null;
     if(wasEditing){
@@ -2558,7 +2935,7 @@ function _doPrint(){
 (async function init(){loadGS();
   if(window.Prism&&window.Prism.plugins&&window.Prism.plugins.autoloader)
     Prism.plugins.autoloader.languages_path='https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/';
-  renderRecs();
+  renderRecs();renderTrendRecs();
   const hasSaved=load();
   if(hasSaved&&S.step>1&&S.toc){
     const resume=await showConfirm({
