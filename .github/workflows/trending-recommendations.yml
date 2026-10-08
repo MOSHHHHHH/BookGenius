@@ -2,22 +2,25 @@ name: Trending Book Recommendations
 
 on:
   schedule:
-    # 05:00 UTC ≈ 07:00/08:00 Israel time (depending on DST).
-    # חשוב: GitHub מפעיל schedule רק אם קובץ ה-workflow נמצא בענף ברירת המחדל.
-    - cron: '0 5 * * *'
+    # Retry every two hours; the script skips successful updates younger than 18 hours.
+    - cron: '17 */2 * * *'
   workflow_dispatch: {}
 
 permissions:
   contents: write
 
 env:
-  # הענף שממנו העבודה קוראת ואליו היא דוחפת את השינויים
-  TARGET_BRANCH: '3.7.1bup'
+  # The branch the job reads from and pushes to (the GitHub Pages branch).
+  # To change it in the future, edit only this line.
+  TARGET_BRANCH: '3.8PUB'
+
+concurrency:
+  group: bookgenius-trending-recommendations
+  cancel-in-progress: false
 
 jobs:
   update-recommendations:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout target branch
         uses: actions/checkout@v4
@@ -32,8 +35,8 @@ jobs:
       - name: Generate trending recommendations
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          # TRENDS_GEO: IL
-          # GEMINI_MODEL: gemini-3.5-flash
+          # TRENDS_GEO: IL                   # default is already IL
+          # GEMINI_MODEL: gemini-3.5-flash   # default in the script; override here if needed
         run: python scripts/trending_recommendations.py
 
       - name: Commit and push if changed
@@ -43,3 +46,4 @@ jobs:
           git add data/trending-recs.json data/trending-recs-history.json
           git diff --cached --quiet || git commit -m "chore: update trending book recommendations"
           git push origin HEAD:${{ env.TARGET_BRANCH }}
+
