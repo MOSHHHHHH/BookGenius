@@ -2,9 +2,8 @@ name: Trending Book Recommendations
 
 on:
   schedule:
-    # 05:00 UTC ≈ 07:00/08:00 Israel time (depending on DST). Adjust as you like.
-    # NOTE: GitHub runs scheduled workflows ONLY from the repo's default branch,
-    # so this file must live on the default branch (see TARGET_BRANCH below).
+    # 05:00 UTC ≈ 07:00/08:00 Israel time (depending on DST).
+    # חשוב: GitHub מפעיל schedule רק אם קובץ ה-workflow נמצא בענף ברירת המחדל.
     - cron: '0 5 * * *'
   workflow_dispatch: {}
 
@@ -12,13 +11,13 @@ permissions:
   contents: write
 
 env:
-  # The branch the job reads from and pushes to (the GitHub Pages branch).
-  # To change it in the future, edit only this line.
-  TARGET_BRANCH: '3.7PUB'
+  # הענף שממנו העבודה קוראת ואליו היא דוחפת את השינויים
+  TARGET_BRANCH: '3.7.1bup'
 
 jobs:
   update-recommendations:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout target branch
         uses: actions/checkout@v4
@@ -33,8 +32,8 @@ jobs:
       - name: Generate trending recommendations
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          # TRENDS_GEO: IL                   # default is already IL
-          # GEMINI_MODEL: gemini-3.5-flash   # default in the script; override here if needed
+          # TRENDS_GEO: IL
+          # GEMINI_MODEL: gemini-3.5-flash
         run: python scripts/trending_recommendations.py
 
       - name: Commit and push if changed
