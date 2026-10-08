@@ -396,6 +396,8 @@ mark.hl.cur{background:#ff9800;outline:2px solid #ff9800;border-radius:2px}
   <div id="trendRecBar" style="display:none;background:linear-gradient(135deg,#fff4e5,#ffe9f0);border-radius:12px;padding:14px 18px;border:1.5px solid var(--border)">
     <p style="font-size:.75rem;font-weight:800;color:#e8590c;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">🔥 בהשראת הטרנדים בגוגל היום</p>
     <div class="rec-bar" id="trendRecButtons"></div>
+    <button class="btn btn-ghost" style="font-size:.75rem;padding:6px 10px;margin-top:8px" onclick="toggleTrendInfo()" id="trendInfoToggle" aria-expanded="false" aria-controls="trendRecInfo"><i class="fas fa-info-circle"></i> מידע נוסף</button>
+    <div id="trendRecInfo" hidden style="font-size:.82rem;line-height:1.8;margin-top:10px"></div>
   </div>
 
   <div class="form-grid">
@@ -497,7 +499,7 @@ mark.hl.cur{background:#ff9800;outline:2px solid #ff9800;border-radius:2px}
       <div style="display:flex;gap:12px;align-items:flex-start">
         <span class="ic-icon">🤖</span>
         <p style="font-size:.87rem;line-height:1.75;color:var(--text)">
-          במקום להעתיק־להדביק הנחייה בנפרד לכל פרק, העתיקו את ההנחייה המלאה — היא כבר כוללת את פרטי הספר שמילאתם — והדביקו אותה בשיחה חדשה עם צ'אטבוט בעל <strong>יכולות תכנות וסוכנות</strong> (כגון Claude).
+          במקום להעתיק־להדביק הנחייה בנפרד לכל פרק, העתיקו את ההנחייה המלאה — היא כבר כוללת את פרטי הספר שמילאתם — והדביקו אותה בשיחה חדשה עם צ'אטבוט בעל <strong>יכולות תכנות וסוכנות</strong> (כגון Claude או ChatGPT במצב Work).
           הוא יכתוב את כל הספר בעצמו — תוכן עניינים ואז פרק־פרק, כולל אימות אוטומטי לכל פרק — ובסוף יפיק עבורכם קובץ JSON שאותו תעלו לכאן, ומיד תוכלו להוריד את הספר.
         </p>
       </div>
@@ -508,6 +510,10 @@ mark.hl.cur{background:#ff9800;outline:2px solid #ff9800;border-radius:2px}
         <a class="llm-link" href="https://claude.ai" target="_blank" rel="noopener" onclick="copyAgentPrompt()">
           <img src="https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://claude.ai&size=32" alt="Claude" onerror="this.style.display='none'">
           Claude
+        </a>
+        <a class="llm-link" href="https://chatgpt.com/?mode=work" target="_blank" rel="noopener" onclick="copyAgentPrompt()" title="פתחו שיחה במצב Work">
+          <img src="https://t0.gstatic.com/faviconV2?client=SOCIAL&amp;type=FAVICON&amp;fallback_opts=TYPE,SIZE,URL&amp;url=https://chatgpt.com&amp;size=32" alt="ChatGPT" onerror="this.style.display='none'">
+          ChatGPT Work
         </a>
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding-top:2px;border-top:1px solid rgba(0,0,0,.06);margin-top:2px">
@@ -611,15 +617,10 @@ mark.hl.cur{background:#ff9800;outline:2px solid #ff9800;border-radius:2px}
       </div>
     </div>
     <div style="padding:22px;overflow-y:auto">
-      <p style="font-size:1rem;font-weight:800;color:var(--primary);margin-bottom:4px">ברוכים הבאים לדור הבא של כתיבת הספרים באמצעות בינה מלאכותית</p>
-      <p style="font-size:.84rem;color:var(--muted);margin-bottom:16px">כתיבת ספרים מעולם לא הייתה קלה יותר</p>
-      <div style="display:flex;flex-direction:column;gap:0">
-        <div class="welcome-feature"><span class="wf-icon">🪟</span><p style="font-size:.84rem;line-height:1.6"><span class="wf-new">חדש!</span><strong>שימוש בחלון PiP</strong> לכתיבה מהירה ונוחה מאי פעם</p></div>
-        <div class="welcome-feature"><span class="wf-icon">💡</span><p style="font-size:.84rem;line-height:1.6"><span class="wf-new">חדש!</span><strong>המלצות ספרים מותאמות אישית</strong></p></div>
-        <div class="welcome-feature"><span class="wf-icon">🤖</span><p style="font-size:.84rem;line-height:1.6"><strong>שימוש בכל LLM שתבחר</strong></p></div>
-        <div class="welcome-feature"><span class="wf-icon">🔒</span><p style="font-size:.84rem;line-height:1.6"><strong>כל המידע מעובד ונשמר במחשב שלך</strong></p></div>
-        <div class="welcome-feature"><span class="wf-icon">♟️</span><p style="font-size:.84rem;line-height:1.6"><strong>תמיכה בקוד, תווים, שחמט ומתמטיקה</strong></p></div>
-        <div class="welcome-feature"><span class="wf-icon">📋</span><p style="font-size:.84rem;line-height:1.6"><strong>טבלאות, ציטוטים והערות</strong> — להבנה מושלמת של הנושא</p></div>
+      <p style="font-size:1rem;font-weight:800;color:var(--primary);margin-bottom:14px">חדש ב־BookGenius! 📚</p>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="welcome-feature"><span class="wf-icon">💡</span><p style="font-size:.84rem;line-height:1.7"><span class="wf-new">חדש!</span><strong>המלצות בהשראת Google</strong><br>גלו רעיונות לספרים בהשראת החיפושים הפופולריים בגוגל בישראל.</p></div>
+        <div class="welcome-feature"><span class="wf-icon">🤖</span><p style="font-size:.84rem;line-height:1.7"><span class="wf-new">חדש!</span><strong>יצירת ספר באמצעות סוכן AI</strong><br>העתיקו את ההנחיה המוכנה לסוכן AI, תנו לו ליצור את הספר, וייבאו את התוצאה ל־BookGenius להצגה ולייצוא.</p></div>
       </div>
       <label class="noshow-row" style="margin-top:16px">
         <input type="checkbox" id="welcomeNoShow">
@@ -896,7 +897,18 @@ const BS_DEF={callouts:true,blockquotes:true,shortStories:false,skillsMode:'auto
 let GS=Object.assign({},GS_DEF);
 let _bsScope='book'; // 'book' or 'global'
 
-function loadGS(){try{const r=localStorage.getItem(GS_KEY);if(r)GS=Object.assign({},GS_DEF,JSON.parse(r));}catch(e){}}
+const WELCOME_VERSION='google-agent-2026-10';
+function loadGS(){
+  try{
+    const r=localStorage.getItem(GS_KEY);if(r)GS=Object.assign({},GS_DEF,JSON.parse(r));
+    if(localStorage.getItem('bg_welcome_version')!==WELCOME_VERSION){
+      GS.showWelcome=true;
+      localStorage.setItem('bg_welcome_skip','0');
+      localStorage.setItem(GS_KEY,JSON.stringify(GS));
+      localStorage.setItem('bg_welcome_version',WELCOME_VERSION);
+    }
+  }catch(e){GS.showWelcome=true;}
+}
 function saveGS(){
   GS.showWelcome=$('gs_showWelcome')?.checked??GS.showWelcome;
   GS.showPrint=$('gs_showPrint')?.checked??GS.showPrint;
@@ -1474,6 +1486,8 @@ Write a single JSON object matching this schema (shown as JSON Schema for refere
 
 {"type":"object","properties":{"book_title":{"type":"string"},"book_description":{"type":"string","description":"1-2 sentence summary in Hebrew"},"skills":{"type":"object","properties":{"chess":{"type":"boolean"},"music":{"type":"boolean"},"code":{"type":"boolean"},"math":{"type":"boolean"}},"required":["chess","music","code","math"]},"chapters":{"type":"array","items":{"type":"object","properties":{"chapter_number":{"type":"integer","description":"0 = introduction chapter if included, otherwise 1,2,3... in ascending order"},"title":{"type":"string"},"description":{"type":"string","description":"2-3 sentence chapter summary in Hebrew"}},"required":["chapter_number","title","description"]}},"book_recommendations":{"type":"array","description":"Exactly 3 book suggestions on related topics","items":{"type":"object","properties":{"topic":{"type":"string"},"desc":{"type":"string"},"writing_instructions":{"type":"string"},"chapters":{"type":"integer","description":"5-15"}},"required":["topic","desc","writing_instructions","chapters"]}}},"required":["book_title","book_description","skills","chapters","book_recommendations"]}
 
+Also recommend exactly 3 distinct related books the reader could create next, just as in the regular BookGenius mode. Each book_recommendations item must contain a Hebrew topic, desc, writing_instructions, and an integer chapters between 5 and 15. Preserve this array inside toc in the final downloadable file.
+
 Guidance for "skills": ${skillsGuidance}
 
 After generating it, validate it yourself: the JSON parses correctly; the "chapters" array length matches the requested chapter count (plus 1 if an introduction chapter was requested); numbering is sequential and ascending (0..N or 1..N); all required fields are present; "book_recommendations" contains exactly 3 items. If anything is wrong, fix it and regenerate — without involving the user.
@@ -1571,6 +1585,9 @@ async function handleImportJSONFile(ev){
     S.toc=data.toc;
     if(!S.toc.skills||typeof S.toc.skills!=='object')S.toc.skills={chess:false,music:false,code:false,math:false,mermaid:false};
     S.done=data.done;
+    if(Array.isArray(S.toc.book_recommendations)&&S.toc.book_recommendations.length){
+      saveRecs(S.toc.book_recommendations);renderRecs();
+    }
     S.step=3;S.curBatch=[];
     save();updateHeader();updateProgress();
     $('settingsModal')?.classList.remove('open');
@@ -1611,6 +1628,23 @@ function applyRec(i){
 const TREND_RECS_URL='./data/trending-recs.json';
 const TREND_RECS_MAX_AGE_MS=36*60*60*1000; // hide if the file is older than 36h (e.g. the Action stopped running)
 let _trendRecs=[];
+function toggleTrendInfo(){
+  const info=$('trendRecInfo');info.hidden=!info.hidden;
+  $('trendInfoToggle').setAttribute('aria-expanded',String(!info.hidden));
+}
+function formatTrendUpdated(value,now=new Date()){
+  const date=new Date(value);if(!Number.isFinite(date.getTime()))return '';
+  const day=d=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+  const days=Math.round((Date.parse(day(now))-Date.parse(day(date)))/86400000);
+  const label=['היום','אתמול','שלשום'][days]||new Intl.DateTimeFormat('he-IL',{timeZone:'Asia/Jerusalem',dateStyle:'short'}).format(date);
+  const time=new Intl.DateTimeFormat('he-IL',{timeZone:'Asia/Jerusalem',hour:'2-digit',minute:'2-digit',hour12:false}).format(date);
+  return `עודכן לאחרונה: ${label} בשעה ${time}`;
+}
+function renderTrendInfo(data){
+  const lines=_trendRecs.filter(r=>r.inspired_by&&r.inspired_by.trim()!=='כללי').map(r=>`<p>הספר ${esc(r.topic)} מומלץ כיוון שהמונח ${esc(r.inspired_by)} הוא פופולארי בגוגל היום.</p>`).join('');
+  const updated=formatTrendUpdated(data.generated_at);
+  $('trendRecInfo').innerHTML=`<p>המלצות ספרים בהשראת החיפושים בגוגל בישראל היום.</p>${lines}${updated?`<p style="margin-top:8px;color:var(--muted)">${esc(updated)}</p>`:''}`;
+}
 async function renderTrendRecs(){
   const bar=$('trendRecBar'),btns=$('trendRecButtons');
   if(!bar||!btns)return;
@@ -1622,6 +1656,7 @@ async function renderTrendRecs(){
     if(!recs.length)throw new Error('empty');
     if(data.generated_at&&(Date.now()-new Date(data.generated_at).getTime())>TREND_RECS_MAX_AGE_MS)throw new Error('stale');
     _trendRecs=recs;
+    renderTrendInfo(data);
     btns.innerHTML=recs.map((r,i)=>`<button class="rec-btn trend" onclick="applyTrendRec(${i})"><i class="fas fa-fire"></i> ${esc(r.topic)}</button>`).join('');
     bar.style.display='block';
   }catch(e){
@@ -2975,3 +3010,4 @@ function _doPrint(){
 <script src="user-data.js"></script>
 </body>
 </html>
+
