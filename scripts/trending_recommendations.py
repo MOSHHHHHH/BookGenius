@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Daily job for BookGenius: reads Israel's Google Trends RSS feed, asks Gemini
+Two-hour retry job for BookGenius: reads Israel's Google Trends RSS feed, asks Gemini
 for 2 evergreen guide/book recommendations inspired by today's trends, and
 writes data/trending-recs.json for the front-end (recBar) to display.
 
@@ -188,7 +188,30 @@ def call_gemini(prompt):
     return json.loads(text)
 
 
+def updated_recently(now=None):
+    """Only a valid successful output suppresses another attempt."""
+    now = now or datetime.now(timezone.utc)
+    try:
+        with open(OUT_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        recs = data.get("recommendations")
+        if not isinstance(recs, list) or len(recs) != 2:
+            return False
+        if not all(isinstance(r, dict) and all(r.get(k) for k in ("topic", "desc", "writing_instructions", "chapters")) for r in recs):
+            return False
+        stamp = datetime.fromisoformat(data["generated_at"].replace("Z", "+00:00"))
+        if stamp.tzinfo is None:
+            return False
+        age = now - stamp
+        return timedelta(0) <= age < timedelta(hours=18)
+    except (OSError, ValueError, TypeError, KeyError, AttributeError):
+        return False
+
+
 def main():
+    if updated_recently():
+        print("SKIP: recommendations updated successfully within the last 18 hours")
+        return
     if not API_KEY:
         print("FAIL: GEMINI_API_KEY is not set")
         sys.exit(1)
@@ -241,3 +264,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
