@@ -2,7 +2,7 @@ name: Trending Book Recommendations
 
 on:
   schedule:
-    # Run hourly; refresh after 24h and fail only when the latest valid update is 30h old.
+    # Run hourly; refresh after 18h and fail only when the latest valid update is 30h old.
     - cron: '17 * * * *'
   workflow_dispatch: {}
 
