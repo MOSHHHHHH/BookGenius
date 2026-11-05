@@ -2,8 +2,8 @@ name: Trending Book Recommendations
 
 on:
   schedule:
-    # Retry every two hours; the script skips successful updates younger than 18 hours.
-    - cron: '17 */2 * * *'
+    # Run hourly; refresh after 24h and fail only when the latest valid update is 30h old.
+    - cron: '17 * * * *'
   workflow_dispatch: {}
 
 permissions:
