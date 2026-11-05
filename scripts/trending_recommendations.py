@@ -16,7 +16,9 @@ in the workflow.
 """
 import json
 import os
+import random
 import sys
+import time
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -29,6 +31,9 @@ NS = {"ht": "https://trends.google.com/trending/rss"}
 # or gemini-3.1-flash-lite for a cheaper/faster option.
 MODEL = os.environ.get("GEMINI_MODEL") or "gemini-3.5-flash"
 API_KEY = os.environ.get("GEMINI_API_KEY", "")
+# Retry only temporary HTTP failures; invalid API keys/permissions fail immediately.
+RETRYABLE_GEMINI_HTTP_CODES = {429, 500, 502, 503, 504}
+GEMINI_MAX_ATTEMPTS = 5
 
 OUT_PATH = os.path.join("data", "trending-recs.json")
 HISTORY_PATH = os.path.join("data", "trending-recs-history.json")
@@ -169,12 +174,28 @@ def call_gemini(prompt):
         headers={"Content-Type": "application/json", "x-goog-api-key": API_KEY},
         method="POST",
     )
-    try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        detail = e.read().decode("utf-8", errors="replace")[:500]
-        raise RuntimeError("HTTP %s (model=%s): %s" % (e.code, MODEL, detail)) from None
+    for attempt in range(1, GEMINI_MAX_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            break
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", errors="replace")[:500]
+            if e.code not in RETRYABLE_GEMINI_HTTP_CODES or attempt == GEMINI_MAX_ATTEMPTS:
+                raise RuntimeError(
+                    "HTTP %s (model=%s, attempt=%s/%s): %s"
+                    % (e.code, MODEL, attempt, GEMINI_MAX_ATTEMPTS, detail)
+                ) from None
+            delay = 2 ** attempt + random.uniform(0, 1)
+            retry_after = e.headers.get("Retry-After") if e.headers else None
+            if retry_after and retry_after.strip().isdigit():
+                delay = max(delay, min(int(retry_after.strip()), 60))
+            print(
+                "WARN: Gemini HTTP %s (model=%s); retrying in %.1fs (attempt %s/%s)"
+                % (e.code, MODEL, delay, attempt, GEMINI_MAX_ATTEMPTS),
+                flush=True,
+            )
+            time.sleep(delay)
 
     candidates = data.get("candidates") or []
     if not candidates:
