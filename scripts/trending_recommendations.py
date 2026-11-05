@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Two-hour retry job for BookGenius: reads Israel's Google Trends RSS feed, asks Gemini
+Hourly job for BookGenius (daily updates, warn before 30h of staleness): reads Israel's Google Trends RSS feed, asks Gemini
 for 2 evergreen guide/book recommendations inspired by today's trends, and
 writes data/trending-recs.json for the front-end (recBar) to display.
 
@@ -39,6 +39,8 @@ OUT_PATH = os.path.join("data", "trending-recs.json")
 HISTORY_PATH = os.path.join("data", "trending-recs-history.json")
 MAX_TRENDS = 15
 HISTORY_DAYS = 5
+REFRESH_INTERVAL = timedelta(hours=24)
+MAX_AGE_BEFORE_ERROR = timedelta(hours=30)
 
 
 def fetch_trends():
@@ -209,80 +211,89 @@ def call_gemini(prompt):
     return json.loads(text)
 
 
-def updated_recently(now=None):
-    """Only a valid successful output suppresses another attempt."""
+def last_success_age(now=None):
+    """Return the age of the last valid saved update, or None if unavailable."""
     now = now or datetime.now(timezone.utc)
     try:
         with open(OUT_PATH, encoding="utf-8") as f:
             data = json.load(f)
         recs = data.get("recommendations")
         if not isinstance(recs, list) or len(recs) != 2:
-            return False
+            return None
         if not all(isinstance(r, dict) and all(r.get(k) for k in ("topic", "desc", "writing_instructions", "chapters")) for r in recs):
-            return False
+            return None
         stamp = datetime.fromisoformat(data["generated_at"].replace("Z", "+00:00"))
         if stamp.tzinfo is None:
-            return False
+            return None
         age = now - stamp
-        return timedelta(0) <= age < timedelta(hours=18)
+        return age if age >= timedelta(0) else None
     except (OSError, ValueError, TypeError, KeyError, AttributeError):
-        return False
+        return None
+
+
+def report_failure(reason):
+    """A failed refresh is nonfatal until the last valid update is 30h old."""
+    age = last_success_age()
+    if age is None:
+        print("FAIL: %s; no valid previous recommendations are available" % reason)
+        return 1
+    age_hours = age.total_seconds() / 3600
+    if age >= MAX_AGE_BEFORE_ERROR:
+        print("FAIL: %s; last successful update was %.1f hours ago (30h limit)" % (reason, age_hours))
+        return 1
+    print("WARN: %s; last successful update was %.1f hours ago (under 30h, retry next hour)" % (reason, age_hours))
+    return 0
 
 
 def main():
-    if updated_recently():
-        print("SKIP: recommendations updated successfully within the last 18 hours")
-        return
-    if not API_KEY:
-        print("FAIL: GEMINI_API_KEY is not set")
-        sys.exit(1)
+    age = last_success_age()
+    if age is not None and age < REFRESH_INTERVAL:
+        print("SKIP: recommendations updated successfully within the last 24 hours")
+        return 0
 
     try:
-        trends = fetch_trends()
-    except (urllib.error.URLError, ET.ParseError) as e:
-        print("FAIL: could not fetch/parse Google Trends RSS:", e)
-        sys.exit(1)
+        if not API_KEY:
+            raise RuntimeError("GEMINI_API_KEY is not set")
 
-    if not trends:
-        print("FAIL: no trends returned from feed")
-        sys.exit(1)
+        try:
+            trends = fetch_trends()
+        except (urllib.error.URLError, ET.ParseError) as e:
+            raise RuntimeError("could not fetch/parse Google Trends RSS: %s" % e) from e
 
-    history = load_history()
-    recent_topics = [h.get("topic", "") for h in history]
+        if not trends:
+            raise RuntimeError("no trends returned from feed")
 
-    prompt = build_prompt(trends, recent_topics)
-
-    try:
+        history = load_history()
+        recent_topics = [h.get("topic", "") for h in history]
+        prompt = build_prompt(trends, recent_topics)
         result = call_gemini(prompt)
+
+        recs = result.get("recommendations") if isinstance(result, dict) else None
+        if not isinstance(recs, list) or len(recs) < 2:
+            raise RuntimeError("Gemini did not return at least 2 recommendations")
+        recs = recs[:2]
+
+        for r in recs:
+            for key in ("topic", "desc", "writing_instructions", "chapters"):
+                if not isinstance(r, dict) or not r.get(key):
+                    raise RuntimeError("a recommendation is missing field: %s" % key)
+
+        os.makedirs("data", exist_ok=True)
+        output = {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "geo": GEO,
+            "recommendations": recs,
+        }
+        with open(OUT_PATH, "w", encoding="utf-8") as f:
+            json.dump(output, f, ensure_ascii=False, indent=2)
+
+        save_history(history, [r["topic"] for r in recs])
     except Exception as e:
-        print("FAIL: Gemini request failed:", e)
-        sys.exit(1)
+        return report_failure(str(e))
 
-    recs = result.get("recommendations") if isinstance(result, dict) else None
-    if not isinstance(recs, list) or len(recs) < 2:
-        print("FAIL: Gemini did not return at least 2 recommendations")
-        sys.exit(1)
-    recs = recs[:2]
-
-    for r in recs:
-        for key in ("topic", "desc", "writing_instructions", "chapters"):
-            if key not in r or not r[key]:
-                print("FAIL: a recommendation is missing field:", key)
-                sys.exit(1)
-
-    os.makedirs("data", exist_ok=True)
-    output = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "geo": GEO,
-        "recommendations": recs,
-    }
-    with open(OUT_PATH, "w", encoding="utf-8") as f:
-        json.dump(output, f, ensure_ascii=False, indent=2)
-
-    save_history(history, [r["topic"] for r in recs])
     print("OK: wrote", OUT_PATH, "with", len(recs), "recommendations")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
-
+    sys.exit(main())
