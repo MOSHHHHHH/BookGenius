@@ -39,7 +39,7 @@ OUT_PATH = os.path.join("data", "trending-recs.json")
 HISTORY_PATH = os.path.join("data", "trending-recs-history.json")
 MAX_TRENDS = 15
 HISTORY_DAYS = 5
-REFRESH_INTERVAL = timedelta(hours=24)
+REFRESH_INTERVAL = timedelta(hours=18)
 MAX_AGE_BEFORE_ERROR = timedelta(hours=30)
 
 
@@ -248,7 +248,7 @@ def report_failure(reason):
 def main():
     age = last_success_age()
     if age is not None and age < REFRESH_INTERVAL:
-        print("SKIP: recommendations updated successfully within the last 24 hours")
+        print("SKIP: recommendations updated successfully within the last 18 hours")
         return 0
 
     try:
